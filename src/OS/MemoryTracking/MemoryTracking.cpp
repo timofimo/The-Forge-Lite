@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -27,19 +27,35 @@
 // Just include the cpp here so we don't have to add it to the all projects
 #include "FluidStudios/MemoryManager/mmgr.cpp"
 
-void* conf_malloc_internal(size_t size, const char *f, int l, const char *sf) { return m_allocator(f, l, sf, m_alloc_malloc, 0, size); }
+void* conf_malloc_internal(size_t size, const char *f, int l, const char *sf) { return mmgrAllocator(f, l, sf, m_alloc_malloc, 0, size); }
 
-void* conf_memalign_internal(size_t align, size_t size, const char *f, int l, const char *sf) { return m_allocator(f, l, sf, m_alloc_memalign, align, size); }
+void* conf_memalign_internal(size_t align, size_t size, const char *f, int l, const char *sf) { return mmgrAllocator(f, l, sf, m_alloc_memalign, align, size); }
 
-void* conf_calloc_internal(size_t count, size_t size, const char *f, int l, const char *sf) { return m_allocator(f, l, sf, m_alloc_calloc, 0, size * count); }
+void* conf_calloc_internal(size_t count, size_t size, const char *f, int l, const char *sf) { return mmgrAllocator(f, l, sf, m_alloc_calloc, 0, size * count); }
 
-void* conf_realloc_internal(void* ptr, size_t size, const char *f, int l, const char *sf) { return m_reallocator(f, l, sf, m_alloc_realloc, size, ptr); }
+void* conf_realloc_internal(void* ptr, size_t size, const char *f, int l, const char *sf) { return mmgrReallocator(f, l, sf, m_alloc_realloc, size, ptr); }
 
-void conf_free_internal(void* ptr, const char *f, int l, const char *sf) { m_deallocator(f, l, sf, m_alloc_free, ptr); }
+void conf_free_internal(void* ptr, const char *f, int l, const char *sf) { mmgrDeallocator(f, l, sf, m_alloc_free, ptr); }
 
 #else
 
+bool MemAllocInit()
+{
+	// No op but this is where you would initialize your memory allocator and bookkeeping data in a real world scenario
+	return true;
+}
+
+void MemAllocExit()
+{
+	// Return all allocated memory to the OS. Analyze memory usage, dump memory leaks, ...
+}
+
 #include <stdlib.h>
+
+
+void mmgrSetLogFileDirectory(const char* directory) {}
+
+void mmgrSetExecutableName(const char* name, size_t length) {}
 
 #ifdef _MSC_VER
 #include <memory.h>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -26,7 +26,7 @@
 
 #include "IRenderer.h"
 
-#include "SpirvTools/SpirvTools.h"
+#include "Tools/SpirvTools/SpirvTools.h"
 #include "Interfaces/ILog.h"
 #include "Interfaces/IMemory.h"
 

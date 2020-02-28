@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -39,8 +39,11 @@ static bool ShaderResourceCmp(ShaderResource* a, ShaderResource* b)
 	isSame = isSame && (a->type == b->type);
 	isSame = isSame && (a->set == b->set);
 	isSame = isSame && (a->reg == b->reg);
-	isSame = isSame && (a->size == b->size);
 
+#ifdef METAL
+    isSame = isSame && (a->mtlArgumentDescriptors.mArgumentIndex == b->mtlArgumentDescriptors.mArgumentIndex);
+#endif
+    
 #ifdef RESOURCE_NAME_CHECK
 	// we may not need this, the rest is enough but if we want to be super sure we can do this check
 	isSame = isSame && (a->name_size == b->name_size);
@@ -217,7 +220,7 @@ void createPipelineReflection(ShaderReflection* pReflection, uint32_t stageCount
 	//Copy over the shader resources in a dynamic array of the correct size
 	if (resourceCount)
 	{
-		pResources = (ShaderResource*)conf_malloc(sizeof(ShaderResource) * resourceCount);
+		pResources = (ShaderResource*)conf_calloc(resourceCount, sizeof(ShaderResource));
 
 		for (uint32_t i = 0; i < resourceCount; ++i)
 		{

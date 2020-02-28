@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -25,48 +25,30 @@
 #ifdef __ANDROID__
 
 #include <ctime>
+#include <unistd.h>
 #include <android/configuration.h>
 #include <android/looper.h>
 #include <android/native_activity.h>
 #include <android/log.h>
 
-#include "EASTL/vector.h"
-#include "EASTL/unordered_map.h"
+#include "../Interfaces/IOperatingSystem.h"
+#include "../Interfaces/ILog.h"
+#include "../Interfaces/ITime.h"
+#include "../Interfaces/IThread.h"
 
-#include "Interfaces/IOperatingSystem.h"
-#include "Interfaces/IPlatformEvents.h"
-#include "Interfaces/ILog.h"
-#include "Interfaces/ITime.h"
-#include "Interfaces/IThread.h"
+#include "../Interfaces/IMemory.h"
 
-#include "Input/InputSystem.h"
-#include "Input/InputMappings.h"
-#include "AndroidFileSystem.cpp"
-#include "Interfaces/IMemory.h"
-
-#define CONFETTI_WINDOW_CLASS L"confetti"
-#define MAX_KEYS 256
-#define MAX_CURSOR_DELTA 200
-
-#define GETX(l) (int(l & 0xFFFF))
-#define GETY(l) (int(l) >> 16)
-
-#define elementsOf(a) (sizeof(a) / sizeof((a)[0]))
-
-static eastl::vector<MonitorDesc>                gMonitors;
-static eastl::unordered_map<void*, WindowsDesc*> gHWNDMap;
-static WindowsDesc                                 gWindow;
+static WindowsDesc gWindow;
 
 void adjustWindow(WindowsDesc* winDesc);
-
-namespace PlatformEvents {
-extern void onWindowResize(const WindowResizeEventData* pData);
-}
 
 void getRecommendedResolution(RectDesc* rect) { *rect = { 0, 0, 1920, 1080 }; }
 
 void requestShutdown() { LOGF(LogLevel::eERROR, "Cannot manually shutdown on Android"); }
 
+void toggleFullscreen(WindowsDesc* window)
+{
+}
 /************************************************************************/
 // App Entrypoint
 /************************************************************************/
@@ -88,15 +70,6 @@ struct DisplayMetrics
 };
 
 DisplayMetrics metrics = {};
-
-static void onResize(const WindowResizeEventData* pData)
-{
-	pApp->mSettings.mWidth = getRectWidth(pData->rect);
-	pApp->mSettings.mHeight = getRectHeight(pData->rect);
-	pApp->mSettings.mFullScreen = pData->pWindow->fullScreen;
-	pApp->Unload();
-	pApp->Load();
-}
 
 float2 getDpiScale()
 {
@@ -216,9 +189,9 @@ static bool    windowReady = false;
 static bool    isActive = false;
 static int32_t handle_input(struct android_app* app, AInputEvent* event)
 {
-	// Forward input events to Gainput
-	InputSystem::UpdateSize(ANativeWindow_getWidth(app->window), ANativeWindow_getHeight(app->window));
-	return InputSystem::HandleMessage(event);
+    if (gWindow.callbacks.onHandleMessage)
+        return gWindow.callbacks.onHandleMessage(&gWindow, event);
+    return 0;
 }
 
 // Process the next main command.
@@ -236,7 +209,7 @@ void handle_cmd(android_app* app, int32_t cmd)
 			gWindow.maximized = false;
 			openWindow(pApp->GetName(), &gWindow);
 
-			gWindow.handle = reinterpret_cast<WindowHandle>(app->window);
+			gWindow.handle.window = reinterpret_cast<void*>(app->window);
 
 			pSettings->mWidth = ANativeWindow_getWidth(app->window);
 			pSettings->mHeight = ANativeWindow_getHeight(app->window);
@@ -246,8 +219,6 @@ void handle_cmd(android_app* app, int32_t cmd)
 			if (!windowReady)
 				pApp->Load();
 			windowReady = true;
-
-			InputSystem::UpdateSize(pSettings->mWidth, pSettings->mHeight);
 			break;
 		}
 		case APP_CMD_TERM_WINDOW:
@@ -294,15 +265,34 @@ void handle_cmd(android_app* app, int32_t cmd)
 	}
 }
 
+// Forward declare the function used by the Android FileSystem to access the ANativeActivity.
+void AndroidFS_SetNativeActivity(ANativeActivity* nativeActivity);
+
 int AndroidMain(void* param, IApp* app)
 {
+	extern bool MemAllocInit();
+	extern void MemAllocExit();
+
+
+	if (!MemAllocInit())
+	{
+		__android_log_print(ANDROID_LOG_ERROR, "The-Forge", "Error starting application");
+		return EXIT_FAILURE;
+	}
 	struct android_app* android_app = (struct android_app*)param;
+	android_activity = android_app->activity;
+	AndroidFS_SetNativeActivity(android_activity);
+	if (!fsInitAPI())
+	{
+		__android_log_print(ANDROID_LOG_ERROR, "The-Forge", "Error starting application");
+		return EXIT_FAILURE;
+	}
+	Log::Init();
+
 
 	// Set the callback to process system events
-    android_app->onAppCmd = handle_cmd;
-
+	android_app->onAppCmd = handle_cmd;
 	pApp = app;
-	android_activity = android_app->activity;
 
 	//Used for automated testing, if enabled app will exit after 120 frames
 #ifdef AUTOMATED_TESTING
@@ -310,10 +300,6 @@ int AndroidMain(void* param, IApp* app)
 	const uint32_t testingDesiredFrameCount = 120;
 #endif
 
-	// Set asset manager.
-	_mgr = (android_app->activity->assetManager);
-
-	FileSystem::SetCurrentDir(FileSystem::GetProgramDir());
 
 	IApp::Settings* pSettings = &pApp->mSettings;
 	Timer deltaTimer;
@@ -326,18 +312,12 @@ int AndroidMain(void* param, IApp* app)
 	}
 	getDisplayMetrics(android_app);
 
-	InputSystem::Init(pSettings->mWidth, pSettings->mHeight);
-    InputSystem::SetMouseCapture(true);
-    InputSystem::SetHideMouseCursorWhileCaptured(false);
+	pApp->pWindow = &gWindow;
 	// Set the callback to process input events
     android_app->onInputEvent = handle_input;
 
 	if (!pApp->Init())
 		abort();
-
-	InputSystem::SetMouseCapture(true);
-
-	registerWindowResizeEvent(onResize);
 
 	bool quit = false;
 
@@ -354,6 +334,9 @@ int AndroidMain(void* param, IApp* app)
 		}
 		if (!windowReady || !isActive)
 		{
+			if (android_app->destroyRequested)
+				quit = true;
+
 			usleep(1);
 			continue;
 		}
@@ -362,7 +345,6 @@ int AndroidMain(void* param, IApp* app)
 		if (deltaTime > 0.15f)
 			deltaTime = 0.05f;
 
-		InputSystem::Update();
 		handleMessages(&gWindow);
 
 		pApp->Update(deltaTime);
@@ -372,7 +354,9 @@ int AndroidMain(void* param, IApp* app)
 		//used in automated tests only.
 		testingFrameCount++;
 		if (testingFrameCount >= testingDesiredFrameCount)
-			quit = true;
+		{
+			ANativeActivity_finish(android_app->activity);
+		}
 #endif
 		if (android_app->destroyRequested)
 			quit = true;
@@ -381,6 +365,15 @@ int AndroidMain(void* param, IApp* app)
 		pApp->Unload();
 	windowReady = false;
 	pApp->Exit();
+
+	Log::Exit();
+	fsDeinitAPI();
+	MemAllocExit();
+
+#ifdef AUTOMATED_TESTING
+	__android_log_print(ANDROID_LOG_INFO, "The-Forge", "Success terminating application");
+	exit(0);
+#endif
 
 	return 0;
 }

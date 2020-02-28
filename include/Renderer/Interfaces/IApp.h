@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -76,11 +76,13 @@ void drawFrame(float deltaTime);
 #ifndef _IAPP_H_
 #define _IAPP_H_
 
+#include "IOperatingSystem.h"
 #include "EASTL/string.h"
+#include "ILog.h"
 
 class IApp
 {
-	public:
+public:
 	virtual bool Init() = 0;
 	virtual void Exit() = 0;
 
@@ -95,77 +97,122 @@ class IApp
 	struct Settings
 	{
 		/// Window width
-		int32_t mWidth = -1;
+		int32_t  mWidth = -1;
 		/// Window height
-		int32_t mHeight = -1;
+		int32_t  mHeight = -1;
 		/// Set to true if fullscreen mode has been requested
-		bool mFullScreen = false;
+		bool     mFullScreen = false;
 		/// Set to true if app wants to use an external window
-		bool mExternalWindow = false;
+		bool     mExternalWindow = false;
 #if defined(TARGET_IOS)
-		bool mShowStatusBar = false;
-		float mContentScaleFactor = 0.f;
+		bool     mShowStatusBar = false;
+		float    mContentScaleFactor = 0.f;
 #endif
 	} mSettings;
 
 	WindowsDesc*    pWindow;
-	eastl::string mCommandLine;
+	const char*     pCommandLine;
+	
+	static int          argc;
+	static const char** argv;
 };
 
 #if defined(_DURANGO)
 #define DEFINE_APPLICATION_MAIN(appClass)                     \
+	int IApp::argc;                                           \
+	const char** IApp::argv;                                  \
 	extern int DurangoMain(int argc, char** argv, IApp* app); \
-                                                              \
+															  \
 	int main(int argc, char** argv)                           \
 	{                                                         \
-		appClass app;                                         \
+		IApp::argc = argc;                                    \
+		IApp::argv = (const char**)argv;                      \
+		appClass app;										  \
 		return DurangoMain(argc, argv, &app);                 \
 	}
 #elif defined(_WIN32)
 #define DEFINE_APPLICATION_MAIN(appClass)                     \
+	int IApp::argc;                                           \
+	const char** IApp::argv;                                  \
 	extern int WindowsMain(int argc, char** argv, IApp* app); \
-                                                              \
+															  \
 	int main(int argc, char** argv)                           \
 	{                                                         \
+		IApp::argc = argc;                                    \
+		IApp::argv = (const char**)argv;                      \
 		appClass app;                                         \
 		return WindowsMain(argc, argv, &app);                 \
 	}
 #elif defined(TARGET_IOS)
 #define DEFINE_APPLICATION_MAIN(appClass)                 \
+	int IApp::argc;                                       \
+	const char** IApp::argv;                              \
 	extern int iOSMain(int argc, char** argv, IApp* app); \
-                                                          \
+														  \
 	int main(int argc, char** argv)                       \
 	{                                                     \
+		IApp::argc = argc;                                \
+		IApp::argv = (const char**)argv;                  \
 		appClass app;                                     \
 		return iOSMain(argc, argv, &app);                 \
 	}
 #elif defined(__APPLE__)
 #define DEFINE_APPLICATION_MAIN(appClass)                         \
+	int IApp::argc;                                               \
+	const char** IApp::argv;                                      \
 	extern int macOSMain(int argc, const char** argv, IApp* app); \
-                                                                  \
+																  \
 	int main(int argc, const char* argv[])                        \
 	{                                                             \
+		IApp::argc = argc;                                        \
+		IApp::argv = argv;                                        \
 		appClass app;                                             \
 		return macOSMain(argc, argv, &app);                       \
 	}
 #elif defined(__ANDROID__)
 #define DEFINE_APPLICATION_MAIN(appClass)           \
+	int IApp::argc;                                 \
+	const char** IApp::argv;                        \
 	extern int AndroidMain(void* param, IApp* app); \
-                                                    \
+													\
 	void android_main(struct android_app* param)    \
 	{                                               \
+		IApp::argc = 0;                             \
+		IApp::argv = NULL;                          \
 		appClass app;                               \
 		AndroidMain(param, &app);                   \
 	}
 
 #elif defined(__linux__)
 #define DEFINE_APPLICATION_MAIN(appClass)                   \
+	int IApp::argc;                                         \
+	const char** IApp::argv;                                \
 	extern int LinuxMain(int argc, char** argv, IApp* app); \
+															\
+	int main(int argc, char** argv)                         \
+	{                                                       \
+		IApp::argc = argc;                                  \
+		IApp::argv = (const char**)argv;                    \
+		appClass app;                                       \
+		return LinuxMain(argc, argv, &app);                 \
+	}
+#elif defined(NX64)
+#define DEFINE_APPLICATION_MAIN(appClass)                   \
+	extern void NxMain(IApp* app);					\
+                                                            \
+	extern "C" void nnMain()								\
+	{														\
+		appClass app;                                       \
+		NxMain(&app);									\
+	}
+#elif defined(ORBIS)
+#define DEFINE_APPLICATION_MAIN(appClass)                   \
+	extern int OrbisMain(int argc, char** argv, IApp* app); \
                                                             \
 	int main(int argc, char** argv)                         \
 	{                                                       \
 		appClass app;                                       \
-		return LinuxMain(argc, argv, &app);                 \
+		return OrbisMain(argc, argv, &app);                 \
 	}
 #else
 #endif

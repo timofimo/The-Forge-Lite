@@ -2,7 +2,7 @@
 if ("$ENV{WIN10_SDK_PATH}$ENV{WIN10_SDK_VERSION}" STREQUAL "" )
   get_filename_component(WIN10_SDK_PATH "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Microsoft SDKs\\Windows\\v10.0;InstallationFolder]" ABSOLUTE CACHE)
   get_filename_component(TEMP_WIN10_SDK_VERSION "[HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Microsoft SDKs\\Windows\\v10.0;ProductVersion]" ABSOLUTE CACHE)
-  get_filename_component(WIN10_SDK_VERSION ${TEMP_WIN10_SDK_VERSION} NAME)
+  get_filename_component(WIN10_SDK_VERSION ${TEMP_WIN10_SDK_VERSION} NAME) 
 elseif(TRUE)
   set (WIN10_SDK_PATH $ENV{WIN10_SDK_PATH})
   set (WIN10_SDK_VERSION $ENV{WIN10_SDK_VERSION})
@@ -34,7 +34,7 @@ find_path(DXGI_INCLUDE_DIR    # Set variable DXGI_INCLUDE_DIR
           HINTS
           )
 
-if ("${DXC_BUILD_ARCH}" STREQUAL "x64" )
+if (CMAKE_SIZEOF_VOID_P EQUAL 8) #x64
   find_library(D3D11_LIBRARY NAMES d3d11.lib
                HINTS ${WIN10_SDK_PATH}/Lib/${WIN10_SDK_VERSION}/um/x64 )
 elseif (CMAKE_GENERATOR MATCHES "Visual Studio.*ARM" OR "${DXC_BUILD_ARCH}" STREQUAL "ARM")
@@ -43,12 +43,12 @@ elseif (CMAKE_GENERATOR MATCHES "Visual Studio.*ARM" OR "${DXC_BUILD_ARCH}" STRE
 elseif (CMAKE_GENERATOR MATCHES "Visual Studio.*ARM64" OR "${DXC_BUILD_ARCH}" STREQUAL "ARM64")
   find_library(D3D11_LIBRARY NAMES d3d11.lib
                HINTS ${WIN10_SDK_PATH}/Lib/${WIN10_SDK_VERSION}/um/arm64 )
-elseif ("${DXC_BUILD_ARCH}" STREQUAL "Win32" )
+elseif (CMAKE_SIZEOF_VOID_P EQUAL 4)
   find_library(D3D11_LIBRARY NAMES d3d11.lib
                HINTS ${WIN10_SDK_PATH}/Lib/${WIN10_SDK_VERSION}/um/x86 )
-endif ("${DXC_BUILD_ARCH}" STREQUAL "x64" )
+endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
 
-if ("${DXC_BUILD_ARCH}" STREQUAL "x64" )
+if (CMAKE_SIZEOF_VOID_P EQUAL 8) #x64
   find_library(DXGI_LIBRARY NAMES dxgi.lib
                HINTS ${WIN10_SDK_PATH}/Lib/${WIN10_SDK_VERSION}/um/x64 )
 elseif (CMAKE_GENERATOR MATCHES "Visual Studio.*ARM" OR "${DXC_BUILD_ARCH}" STREQUAL "ARM")
@@ -57,10 +57,10 @@ elseif (CMAKE_GENERATOR MATCHES "Visual Studio.*ARM" OR "${DXC_BUILD_ARCH}" STRE
 elseif (CMAKE_GENERATOR MATCHES "Visual Studio.*ARM64" OR "${DXC_BUILD_ARCH}" STREQUAL "ARM64")
   find_library(DXGI_LIBRARY NAMES dxgi.lib
                HINTS ${WIN10_SDK_PATH}/Lib/${WIN10_SDK_VERSION}/um/arm64 )
-elseif ("${DXC_BUILD_ARCH}" STREQUAL "Win32" )
+elseif (CMAKE_SIZEOF_VOID_P EQUAL 4)
   find_library(DXGI_LIBRARY NAMES dxgi.lib
                HINTS ${WIN10_SDK_PATH}/Lib/${WIN10_SDK_VERSION}/um/x86 )
-endif ("${DXC_BUILD_ARCH}" STREQUAL "x64" )
+endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
 
 set(D3D11_LIBRARIES ${D3D11_LIBRARY} ${DXGI_LIBRARY})
 set(D3D11_INCLUDE_DIRS ${D3D11_INCLUDE_DIR} ${DXGI_INCLUDE_DIR})

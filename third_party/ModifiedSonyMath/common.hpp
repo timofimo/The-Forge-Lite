@@ -90,18 +90,17 @@ inline Matrix4 makeShadowMatrix(const Vector4 & plane, const Vector4 & light)
 #include <stdint.h>
 #include <stdlib.h>
 
-#ifdef TARGET_IOS
-#else
-#ifdef __ANDROID__
+#if defined(TARGET_IOS)
+#elif defined(__ANDROID__)
+#elif defined(NN_NINTENDO_SDK)
 #else
 #include <immintrin.h>
-#endif
 #endif
 
 #include "OS/Core/Compiler.h"
 
 /*
-* Copyright (c) 2018-2019 Confetti Interactive Inc.
+* Copyright (c) 2018-2020 The Forge Interactive Inc.
 *
 * This file is part of The-Forge
 * (see https://github.com/ConfettiFX/The-Forge).
@@ -673,7 +672,7 @@ typedef unsigned uint;
 struct uint2
 {
 	uint2() = default;
-	uint2(uint x, uint y) : x(x), y(y) {}
+	constexpr uint2(uint x, uint y) : x(x), y(y) {}
 	uint2(uint x) : x(x), y(x) {}
 	uint2(const uint2& f) : x(f.x), y(f.y) {}
 	uint2(const uint(&fv)[2]) : x(fv[0]), y(fv[1]) {}
@@ -720,7 +719,7 @@ inline const uint2& operator/=(uint2&a, const uint2& b) { return a = a / b; }
 struct uint3
 {
 	uint3() = default;
-	uint3(uint x, uint y, uint z) : x(x), y(y), z(z) {}
+	constexpr uint3(uint x, uint y, uint z) : x(x), y(y), z(z) {}
 	uint3(uint x) : x(x), y(x), z(x) {}
 	uint3(const uint3& f) : x(f.x), y(f.y), z(f.z) {}
 	uint3(const uint(&fv)[3]) : x(fv[0]), y(fv[1]), z(fv[2]) {}
@@ -762,7 +761,7 @@ inline const uint3& operator/=(uint3&a, const uint3& b) { return a = a / b; }
 struct uint4
 {
 	uint4() = default;
-	uint4(uint x, uint y, uint z, uint w) : x(x), y(y), z(z), w(w) {}
+	constexpr uint4(uint x, uint y, uint z, uint w) : x(x), y(y), z(z), w(w) {}
 	uint4(uint x) : x(x), y(x), z(x), w(x) {}
 	uint4(const uint3& f, uint w) : x(f.x), y(f.y), z(f.z), w(w) {}
 	uint4(const uint4& f) : x(f.x), y(f.y), z(f.z), w(f.w) {}
@@ -830,6 +829,13 @@ constexpr T min(const T &x, const T &y) { return (x < y) ? x : y; }
 template <class T>
 constexpr T max(const T &x, const T &y) { return (x > y) ? x : y; }
 
+template <>
+constexpr uint2 min<>(const uint2 &x, const uint2 &y) { return { min(x.x, y.x), min(x.y, y.y) }; }
+template <>
+constexpr uint3 min<>(const uint3 &x, const uint3 &y) { return { min(x.x, y.x), min(x.y, y.y), min(x.z, y.z) }; }
+template <>
+constexpr uint4 min<>(const uint4 &x, const uint4 &y) { return { min(x.x, y.x), min(x.y, y.y), min(x.z, y.z), min(x.w, y.w) }; }
+
 inline uint2 min(const uint2 &x, const uint2& y) { return { min(x.x, y.x), min(x.y, y.y) }; }
 inline uint3 min(const uint3 &x, const uint3& y) { return { min(x.x, y.x), min(x.y, y.y), min(x.z, y.z) }; }
 inline uint4 min(const uint4 &x, const uint4& y) { return { min(x.x, y.x), min(x.y, y.y), min(x.z, y.z), min(x.w, y.w) }; }
@@ -854,6 +860,31 @@ inline Vector3 max(const Vector3 &a, const Vector3 &b)
 		max(a.getZ(), b.getZ()));
 #else
 	return Vector3(_mm_max_ps(a.get128(), b.get128()));
+#endif
+}
+
+inline Vector4 min(const Vector4& a, const Vector4& b)
+{
+#if VECTORMATH_MODE_SCALAR
+	return Vector4(
+		min(a.getX(), b.getX()),
+		min(a.getY(), b.getY()),
+		min(a.getZ(), b.getZ()),
+		min(a.getW(), b.getW()));
+#else
+	return Vector4(_mm_min_ps(a.get128(), b.get128()));
+#endif
+}
+inline Vector4 max(const Vector4& a, const Vector4& b)
+{
+#if VECTORMATH_MODE_SCALAR
+	return Vector4(
+		max(a.getX(), b.getX()),
+		max(a.getY(), b.getY()),
+		max(a.getZ(), b.getZ()),
+		max(a.getW(), b.getW()));
+#else
+	return Vector4(_mm_max_ps(a.get128(), b.get128()));
 #endif
 }
 
@@ -1410,11 +1441,11 @@ struct TexVertex
 	float2 texCoord;
 };
 
-#define MAKETEXQUAD(x0, y0, x1, y1, o)\
-	TexVertex(float2(x0 + o, y0 + o), float2(0, 0)),\
-	TexVertex(float2(x0 + o, y1 - o), float2(0, 1)),\
-	TexVertex(float2(x1 - o, y0 + o), float2(1, 0)),\
-	TexVertex(float2(x1 - o, y1 - o), float2(1, 1)),
+#define MAKETEXQUAD(vert, x0, y0, x1, y1, o)\
+	vert[0] = TexVertex(float2(x0 + o, y0 + o), float2(0, 0));\
+	vert[1] = TexVertex(float2(x0 + o, y1 - o), float2(0, 1));\
+	vert[2] = TexVertex(float2(x1 - o, y0 + o), float2(1, 0));\
+	vert[3] = TexVertex(float2(x1 - o, y1 - o), float2(1, 1));
 //----------------------------------------------------------------------------
 // Intersection Helpers
 //----------------------------------------------------------------------------
@@ -1472,6 +1503,13 @@ struct AABB
 		minBounds = Vector3(-0.001f, -0.001f, -0.001f);
 		maxBounds = Vector3(0.001f, 0.001f, 0.001f);
 	}
+
+	AABB(Vector3 const& argsMinBounds, Vector3 const& argsMaxBounds)
+	{
+		minBounds = argsMinBounds;
+		maxBounds = argsMaxBounds;
+	}
+
 	inline void Transform(Matrix4 const& mat)
 	{
 		minBounds = (mat * Vector4(minBounds.getX(), minBounds.getY(), minBounds.getZ(), 1.0f)).getXYZ();

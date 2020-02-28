@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -25,21 +25,15 @@
 #pragma once
 
 #include "EASTL/string.h"
-#include "OS/Logging/Log.h"
+#include "Logging/Log.h"
 #include "ITime.h"
 
-void _ErrorMsg(int line, const char*, const char* string, ...);
-void _WarningMsg(int line, const char*, const char* string, ...);
-void _InfoMsg(int line, const char*, const char* string, ...);
 void _FailedAssert(const char* file, int line, const char* statement);
 void _OutputDebugString(const char* str, ...);
+void _OutputDebugStringV(const char* str, va_list args);
 
 void _PrintUnicode(const eastl::string& str, bool error = false);
 void _PrintUnicodeLine(const eastl::string& str, bool error = false);
-
-#define ErrorMsg(str, ...) _ErrorMsg(__LINE__, __FILE__, str, ##__VA_ARGS__)
-#define WarningMsg(str, ...) _WarningMsg(__LINE__, __FILE__, str, ##__VA_ARGS__)
-#define InfoMsg(str, ...) _InfoMsg(__LINE__, __FILE__, str, ##__VA_ARGS__)
 
 #if _MSC_VER >= 1400
 // To make MSVC 2005 happy
@@ -55,18 +49,18 @@ void _PrintUnicodeLine(const eastl::string& str, bool error = false);
 #define IFASSERT(x) x
 
 #if defined(_XBOX)
-
-#elif defined(ORBIS)
-// there is a large amount of stuff included via header files ...
-#define ASSERT(cond) SCE_GNM_ASSERT(cond)
 #else
 #define ASSERT(b) \
-	if (b) {}     \
-	else          \
-		_FailedAssert(__FILE__, __LINE__, #b)
+	if (!(b)) _FailedAssert(__FILE__, __LINE__, #b)
 #endif
 #else
+
+#if defined(NX64)
+#define ASSERT(b) (void)(b)
+#else
 #define ASSERT(b) assume(b)
+#endif
+
 #if _MSC_VER >= 1400
 #define IFASSERT(x) x
 #else
@@ -110,4 +104,36 @@ void _PrintUnicodeLine(const eastl::string& str, bool error = false);
 // Usage: DRAW_LOGF_IF(LogLevel::eINFO | LogLevel::eDEBUG, boolean_value && integer_value == 5, "Whatever string %s, this is an int %d", "This is a string", 1)
 #define DRAW_LOGF_IF(log_level, condition, ...)
 
+#endif
+
+//====================
+//Taken from Gladiator
+//====================
+
+#ifndef USE_LOGGING
+#define USE_LOGGING 0
+#endif
+
+#ifdef USE_LOGGING
+#define LOGDEBUG(message) LogManager::Write(LogLevel::eDEBUG, ToString(__FUNCTION__, message, ""))
+#define LOGINFO(message) LogManager::Write(LogLevel::eINFO, ToString(__FUNCTION__, message, ""))
+#define LOGWARNING(message) LogManager::Write(LogLevel::eWARNING, ToString(__FUNCTION__, message, ""))
+#define LOGERROR(message) LogManager::Write(LogLevel::eERROR, ToString(__FUNCTION__, message, ""))
+#define LOGRAW(message) LogManager::WriteRaw(ToString(__FUNCTION__, message, ""))
+#define LOGDEBUGF(format, ...) LogManager::Write(LogLevel::eDEBUG, ToString(__FUNCTION__, format, ##__VA_ARGS__))
+#define LOGINFOF(format, ...) LogManager::Write(LogLevel::eINFO, ToString(__FUNCTION__, format, ##__VA_ARGS__))
+#define LOGWARNINGF(format, ...) LogManager::Write(LogLevel::eWARNING, ToString(__FUNCTION__, format, ##__VA_ARGS__))
+#define LOGERRORF(format, ...) LogManager::Write(LogLevel::eERROR, ToString(__FUNCTION__, format, ##__VA_ARGS__))
+#define LOGRAWF(format, ...) LogManager::WriteRaw(ToString(__FUNCTION__, format, ##__VA_ARGS__))
+#else
+#define LOGDEBUG(message) ((void)0)
+#define LOGINFO(message) ((void)0)
+#define LOGWARNING(message) ((void)0)
+#define LOGERROR(message) ((void)0)
+#define LOGRAW(message) ((void)0)
+#define LOGDEBUGF(...) ((void)0)
+#define LOGINFOF(...) ((void)0)
+#define LOGWARNINGF(...) ((void)0)
+#define LOGERRORF(...) ((void)0)
+#define LOGRAWF(...) ((void)0)
 #endif

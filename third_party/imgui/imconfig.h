@@ -14,7 +14,7 @@
 #pragma once
 
 #include "Interfaces/ILog.h"
-#include "OS/Math/MathTypes.h"
+#include "Math/MathTypes.h"
 #include "EASTL/vector.h"
 
 //---- Define assertion handler. Defaults to calling assert().

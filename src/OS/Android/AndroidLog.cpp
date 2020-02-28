@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -26,12 +26,13 @@
 #include <cstdio>
 #include <iostream>
 #include <unistd.h>
-#include "Interfaces/IOperatingSystem.h"
+#include "../Interfaces/IOperatingSystem.h"
 
 // interfaces
-#include "Interfaces/ILog.h"
+#include "../Interfaces/ILog.h"
 #include <assert.h>
-#include "Interfaces/IMemory.h"
+#include "../Interfaces/IMemory.h"
+#include <android/log.h>
 
 void outputLogString(const char* pszStr)
 {
@@ -39,81 +40,26 @@ void outputLogString(const char* pszStr)
 	_OutputDebugString("\n");
 }
 
-void _ErrorMsg(int line, const char* file, const char* string, ...)
+void _OutputDebugStringV(const char* str, va_list args)
 {
-	ASSERT(string);
-	//Eval the string
-	const unsigned BUFFER_SIZE = 65536;
-	char           buf[BUFFER_SIZE];
-	// put source code file name at the begin
-	snprintf(buf, BUFFER_SIZE, "%s", file);
-	// put line positoin in code
-	snprintf(buf + strlen(buf), BUFFER_SIZE - strlen(buf), "(%d)\t", line);
+#if defined(_DEBUG) || defined(AUTOMATED_TESTING)
+	const unsigned BUFFER_SIZE = 4096;
+    char           buf[BUFFER_SIZE];
 
-  va_list arglist;
-  va_start(arglist, string);
-  //  vsprintf_s(buf + strlen(buf), BUFFER_SIZE - strlen(buf), string, arglist);
-  vsnprintf(buf + strlen(buf), BUFFER_SIZE - strlen(buf), string, arglist);
-  va_end(arglist);
+    vsprintf_s(buf, BUFFER_SIZE, str, args);
 
-	printf("Error: %s", buf);
-}
-
-void _WarningMsg(int line, const char* file, const char* string, ...)
-{
-	ASSERT(string);
-
-	//Eval the string
-	const unsigned BUFFER_SIZE = 65536;
-	char           buf[BUFFER_SIZE];
-
-	// put source code file name at the begin
-	snprintf(buf, BUFFER_SIZE, "%s", file);
-	// put line positoin in code
-	snprintf(buf + strlen(buf), BUFFER_SIZE - strlen(buf), "(%d)\t", line);
-
-  va_list arglist;
-  va_start(arglist, string);
-  vsnprintf(buf + strlen(buf), BUFFER_SIZE - strlen(buf), string, arglist);
-  va_end(arglist);
-
-	printf("Warning: %s", buf);
-}
-
-void _InfoMsg(int line, const char* file, const char* string, ...)
-{
-	ASSERT(string);
-
-	//Eval the string
-	const unsigned BUFFER_SIZE = 65536;
-	char           buf[BUFFER_SIZE];
-
-	// put source code file name at the begin
-	snprintf(buf, BUFFER_SIZE, "%s", file);
-	// put line positoin in code
-	snprintf(buf + strlen(buf), BUFFER_SIZE - strlen(buf), "(%d)\t", line);
-
-	va_list arglist;
-	va_start(arglist, string);
-	vsprintf_s(buf + strlen(buf), BUFFER_SIZE - strlen(buf), string, arglist);
-	va_end(arglist);
-
-	_OutputDebugString(buf);
+	// stdout doesn't work on android. we need to use ndk log functionality.
+    //printf("%s\n", buf);
+	__android_log_print(ANDROID_LOG_INFO, "The-Forge", buf);
+#endif
 }
 
 void _OutputDebugString(const char* str, ...)
 {
-#ifdef _DEBUG
-	const unsigned BUFFER_SIZE = 4096;
-	char           buf[BUFFER_SIZE];
-
-  va_list arglist;
-  va_start(arglist, str);
-  vsnprintf(buf, BUFFER_SIZE, str, arglist);
-  va_end(arglist);
-
-	printf("%s\n", buf);
-#endif
+	va_list arglist;
+	va_start(arglist, str);
+	_OutputDebugStringV(str, arglist);
+	va_end(arglist);
 }
 
 void _FailedAssert(const char* file, int line, const char* statement)
@@ -127,7 +73,17 @@ void _FailedAssert(const char* file, int line, const char* statement)
 	assert(0);
 }
 
-void _PrintUnicode(const eastl::string& str, bool error) { outputLogString(str.c_str()); }
+void _PrintUnicode(const eastl::string& str, bool error) { 
+
+	if (error)
+	{
+		__android_log_print(ANDROID_LOG_ERROR, "The-Forge", str.c_str());
+	}
+	else
+	{
+		outputLogString(str.c_str());
+	}
+}
 
 void _PrintUnicodeLine(const eastl::string& str, bool error) { _PrintUnicode(str, error); }
 #endif    // ifdef __ANDROID__

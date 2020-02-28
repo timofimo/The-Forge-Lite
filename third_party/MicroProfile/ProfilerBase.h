@@ -71,7 +71,7 @@
 // CONFFX: We do not support profile when dealing with multiple runtime graphic apis
 // CONFFX: We do not support xbox yet
 
-#include "Renderer/Interfaces/IProfiler.h"
+#include "Interfaces/IProfiler.h"
 
 #if 0 == PROFILE_ENABLED
 
@@ -133,10 +133,11 @@
 
 #ifndef PROFILE_NOCXX11
 //#include <thread>
-#include "Renderer/Interfaces/IThread.h"
+#include "Interfaces/IThread.h"
 #include <mutex>
 #include <atomic>
 #endif
+#include "Interfaces/IFileSystem.h"
 
 #ifndef PROFILE_API
 #define PROFILE_API
@@ -191,7 +192,7 @@ typedef uint32_t ProfileThreadIdType;
 #define P_GETCURRENTPROCESSID() GetCurrentProcessId()
 typedef uint32_t ProfileProcessIdType;
 
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(ORBIS)
 #include <unistd.h>
 #include <time.h>
 inline int64_t ProfileTicksPerSecondCpu()
@@ -206,7 +207,7 @@ inline int64_t ProfileGetTick()
 	return 1000000000ll * ts.tv_sec + ts.tv_nsec;
 }
 #define strcpy_s(pDest, size, pSrc) strncpy(pDest,pSrc, size)
-#define fopen_s(pFile,filename,mode) ((*(pFile))=fopen((filename),(mode)))==NULL
+#define fopen_s(pFile,filename,mode) ((*(pFile))=(FILE*)open_file((filename),(mode)))==NULL
 
 #define P_TICK() ProfileGetTick()
 #define P_BREAK() __builtin_trap()
@@ -218,8 +219,26 @@ inline int64_t ProfileGetTick()
 typedef uint64_t ProfileThreadIdType;
 #define P_GETCURRENTPROCESSID() getpid()
 typedef uint32_t ProfileProcessIdType;
-#endif
 
+#elif defined(NX64)
+#include <time.h>
+inline int64_t ProfileGetTick()
+{
+	timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	return 1000000000ll * ts.tv_sec + ts.tv_nsec;
+}
+
+inline int64_t ProfileTicksPerSecondCpu()
+{
+	return 1000000000ll;
+}
+
+#define P_TICK() ProfileGetTick()
+#define P_BREAK() __builtin_trap()
+#define P_THREAD_LOCAL thread_local
+#define P_STRCASECMP strcasecmp
+#endif
 
 #ifndef P_GETCURRENTTHREADID 
 #define P_GETCURRENTTHREADID() 0
@@ -414,7 +433,7 @@ PROFILE_API uint32_t ProfileContextSwitchGatherThreads(uint32_t nContextSwitchSt
 
 PROFILE_API const char* ProfileGetProcessName(ProfileProcessIdType nId, char* Buffer, uint32_t nSize);
 
-PROFILE_API void ProfileDumpFile(const char* pPath, ProfileDumpType eType, uint32_t nFrames);
+PROFILE_API void ProfileDumpFile(const Path* pPath, ProfileDumpType eType, uint32_t nFrames);
 
 typedef void ProfileWriteCallback(void* Handle, size_t size, const char* pData);
 PROFILE_API void ProfileDumpHtml(ProfileWriteCallback CB, void* Handle, int nMaxFrames, const char* pHost);
@@ -736,7 +755,7 @@ struct Profile
 	uint32_t nAutoClearFrames;
 	ProfileDumpType eDumpType;
 	uint32_t nDumpFrames;
-	char DumpPath[512];
+	Path* DumpPath;
 
 	int64_t nPauseTicks;
 

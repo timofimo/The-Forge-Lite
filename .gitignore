@@ -7,3 +7,4 @@ install
 *.creator.user
 *.files
 *.includes
+**/Shaders/**/Binary/**

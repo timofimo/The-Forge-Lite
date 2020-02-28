@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -44,10 +44,12 @@ typedef uint64_t uint64;
 #if defined(__ANDROID__)
 #include <android_native_app_glue.h>
 #include <android/log.h>
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(VK_USE_PLATFORM_GGP)
 #define VK_USE_PLATFORM_XLIB_KHR
 #if defined(VK_USE_PLATFORM_XLIB_KHR) || defined(VK_USE_PLATFORM_XCB_KHR)
 #include <X11/Xutil.h>
+// X11 defines primitive types which conflict with Forge libraries
+#undef Bool
 #endif
 #endif
 
@@ -65,10 +67,25 @@ typedef uint64_t uint64;
 #include <time.h>
 #include <ctime>
 
+#include <float.h>
+#include <limits.h>
+#include <stddef.h>
+
 #ifndef _WIN32
+#include <unistd.h>
+#endif
+
+#if !defined(_WIN32)
 #define stricmp(a, b) strcasecmp(a, b)
+#if !defined(ORBIS)
 #define vsprintf_s vsnprintf
 #define strncpy_s strncpy
+#endif
+#endif
+
+#if defined(_MSC_VER) && !defined(NX64)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
 #endif
 
 #if defined(_DURANGO)
@@ -76,52 +93,62 @@ typedef uint64_t uint64;
 #endif
 
 typedef void* IconHandle;
-typedef void* WindowHandle;
+
+typedef struct WindowHandle
+{
+#if defined(VK_USE_PLATFORM_XLIB_KHR)
+	Display*                 display;
+	Window                   window;
+	Atom                     xlib_wm_delete_window;
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+	xcb_connection_t*        connection;
+	xcb_window_t             window;
+	xcb_screen_t*            screen;
+	xcb_intern_atom_reply_t* atom_wm_delete_window;
+#else
+	void*                    window;    //hWnd
+#endif
+} WindowHandle;
 
 typedef struct RectDesc
 {
-	int left;
-	int top;
-	int right;
-	int bottom;
+	int32_t left;
+	int32_t top;
+	int32_t right;
+	int32_t bottom;
 } RectDesc;
 
 inline int getRectWidth(const RectDesc& rect) { return rect.right - rect.left; }
 
 inline int getRectHeight(const RectDesc& rect) { return rect.bottom - rect.top; }
 
+struct WindowsDesc;
+
+struct WindowCallbacks
+{
+	void    (*onResize)(WindowsDesc* window, int32_t newSizeX, int32_t newSizeY);
+	int32_t (*onHandleMessage)(WindowsDesc* window, void* msg);
+};
+
 typedef struct WindowsDesc
 {
-#if defined(VK_USE_PLATFORM_XLIB_KHR)
-	Display* display;
-	Window   xlib_window;
-	Atom     xlib_wm_delete_window;
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-	Display*                 display;
-	xcb_connection_t*        connection;
-	xcb_screen_t*            screen;
-	xcb_window_t             xcb_window;
-	xcb_intern_atom_reply_t* atom_wm_delete_window;
-#else
-	WindowHandle handle = NULL;    //hWnd
-#endif
-	RectDesc   windowedRect;
-	RectDesc   fullscreenRect;
-	RectDesc   clientRect;
-	bool       fullScreen = false;
-	unsigned   windowsFlags = 0;
-	IconHandle bigIcon = NULL;
-	IconHandle smallIcon = NULL;
+	WindowHandle              handle;    //hWnd
 
-	bool cursorTracked = false;
-	bool iconified = false;
-	bool maximized = false;
-	bool minimized = false;
-	bool visible = true;
+	WindowCallbacks           callbacks;
 
-	// maybe that should go to the input system?
-	// The last received cursor position, regardless of source
-	int lastCursorPosX, lastCursorPosY;
+	RectDesc                  windowedRect;
+	RectDesc                  fullscreenRect;
+	RectDesc                  clientRect;
+	IconHandle                bigIcon;
+	IconHandle                smallIcon;
+
+	uint32_t                  windowsFlags;
+	bool                      fullScreen;
+	bool                      cursorTracked;
+	bool                      iconified;
+	bool                      maximized;
+	bool                      minimized;
+	bool                      hide;
 } WindowsDesc;
 
 typedef struct Resolution
@@ -143,10 +170,10 @@ typedef struct MonitorDesc
 	WCHAR publicAdapterName[64];
 	WCHAR publicDisplayName[64];
 #else
-	char                     adapterName[32];
-	char                     displayName[32];
-	char                     publicAdapterName[64];
-	char                     publicDisplayName[64];
+	char  adapterName[32];
+	char  displayName[32];
+	char  publicAdapterName[64];
+	char  publicDisplayName[64];
 #endif
 	bool modesPruned;
 	bool modeChanged;
@@ -155,9 +182,6 @@ typedef struct MonitorDesc
 	Resolution* resolutions;
 	uint32_t    resolutionCount;
 } MonitorDesc;
-
-#include <float.h>
-#include <limits.h>
 
 // Define some sized types
 typedef uint8_t uint8;
@@ -169,7 +193,6 @@ typedef int16_t  int16;
 typedef uint32_t uint32;
 typedef int32_t  int32;
 
-#include <stddef.h>
 typedef ptrdiff_t intptr;
 
 #ifdef _WIN32
@@ -184,6 +207,11 @@ typedef long long int int64;
 typedef unsigned long DWORD;
 typedef unsigned int UINT;
 typedef int64_t int64;
+typedef uint64_t uint64;
+#elif defined(NX64)
+typedef unsigned long DWORD;
+typedef unsigned int UINT;
+typedef long long int int64;
 typedef uint64_t uint64;
 #else
 typedef signed long long   int64;
@@ -219,7 +247,15 @@ MonitorDesc* getMonitor(uint32_t index);
 float2       getDpiScale();
 
 bool getResolutionSupport(const MonitorDesc* pMonitor, const Resolution* pRes);
+
+// Shell commands
+
+typedef struct Path Path;
+
+/// @param stdOutFile The file to which the output of the command should be written. May be NULL.
+int systemRun(const char *command, const char **arguments, size_t argumentCount, const Path* stdOutFile);
+
+
 //
 // failure research ...
 //
-#include "Interfaces/IPlatformEvents.h"

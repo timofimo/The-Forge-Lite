@@ -88,6 +88,9 @@ typedef __m128i Vector4Int;
 
 typedef const __m128i _Vector4Int;
 
+static const float kNormalizationToleranceSq = 1e-6f;
+static const float kNormalizationToleranceEstSq = 2e-3f;
+
 //========================================= #ConfettiAnimationMathExtensionsEnd =======================================
 //========================================= #ConfettiMathExtensionsEnd ================================================
 
@@ -416,6 +419,24 @@ inline const Vector3 select(const Vector3 & vec0, const Vector3 & vec1, bool sel
 //
 inline const Vector3 select(const Vector3 & vec0, const Vector3 & vec1, const BoolInVec & select1);
 
+// Returns per element binary logical xor operation of _a and _b.
+// _v[0...127] = _a[0...127] ^ _b[0...127]
+//
+inline const Vector3 xorPerElem(const Vector3& a, const FloatInVec b);
+
+// Compute the squareroot of a 3-D vector per element
+//
+inline const Vector3 sqrtPerElem(const Vector3& vec);
+
+// Returns the per component estimated reciprocal square root of v, where
+// approximation is improved with one more new Newton-Raphson step.
+//
+inline const Vector3 rSqrtEstNR(const Vector3& v);
+
+// Tests if the components x, y and z of _v forms a normalized vector.
+//
+inline bool isNormalizedEst(const Vector3& v);
+
 // Store x, y, and z elements of 3-D vector in first three words of a quadword, preserving fourth word
 //
 inline void storeXYZ(const Vector3 & vec, __m128 * quad);
@@ -503,7 +524,7 @@ public:
 
     // Convert from integer vector to float vector.
     //
-    explicit inline Vector4(const Vector4Int vecInt);
+	static inline const Vector4 fromVector4Int(const Vector4Int vecInt);
 
     //========================================= #ConfettiAnimationMathExtensionsEnd =======================================
     //========================================= #ConfettiMathExtensionsEnd ================================================
@@ -729,6 +750,10 @@ inline const Vector4 rSqrtEst(const Vector4& v);
 // approximation is improved with one more new Newton-Raphson step.
 //
 inline const Vector4 rSqrtEstNR(const Vector4& v);
+
+// Computes the per element arccosine
+//
+inline const Vector4 aCos(const Vector4& arg);
 
 //========================================= #ConfettiAnimationMathExtensionsEnd =======================================
 //========================================= #ConfettiMathExtensionsEnd ================================================
@@ -1425,6 +1450,10 @@ public:
     //
     static inline const Quat rotationZ(const FloatInVec & radians);
 
+    static inline const Quat fromVectors(const Vector3& from, const Vector3& to);
+
+    static inline const Quat fromAxisCosAngle(const Vector3& axis, const FloatInVec& cos);
+
 } VECTORMATH_ALIGNED_TYPE_POST;
 
 // Multiply a quaternion by a scalar
@@ -2061,10 +2090,14 @@ public:
     static inline const Matrix4 orthographic(float left, float right, float bottom, float top, float zNear, float zFar);
 
 	//========================================= #ConfettiMathExtensionsBegin ================================================
+	// Construct an reversed orthographic projection matrix
+	//
+	static inline const Matrix4 orthographicReverseZ(float left, float right, float bottom, float top, float zNear, float zFar);
+
 	// Construct a perspective projection matrix using horizontal fov
 	// 
 	static inline const Matrix4 perspective(float fovxRadians, float aspectInverse, float zNear, float zFar);
-  static inline const Matrix4 perspectiveReverseZ(float fovxRadians, float aspectInverse, float zNear, float zFar);
+	static inline const Matrix4 perspectiveReverseZ(float fovxRadians, float aspectInverse, float zNear, float zFar);
 
 	static inline const Matrix4 rotationYX(const float radiansY, const float radiansX);
 	static inline const Matrix4 rotationXY(const float radiansX, const float radiansY);
@@ -2839,6 +2872,10 @@ inline Vector4Int Select(const Vector4Int _b, const Vector4Int _true, const Vect
 // _v[0...127] = _a[0...127] & _b[0...127]
 inline Vector4Int And(const Vector4Int _a, const Vector4Int _b);
 
+// Returns per element binary and operation of _a and _b.
+// _v[0...127] = _a[0...127] & _b[0...127]
+inline Vector4Int And(const Vector4Int& a, const BoolInVec b);
+
 // Returns per element binary or operation of _a and _b.
 // _v[0...127] = _a[0...127] | _b[0...127]
 inline Vector4Int Or(const Vector4Int _a, const Vector4Int _b);
@@ -3245,13 +3282,13 @@ inline const uint sum(const UVector3 & vec);
 
 #ifdef VECTORMATH_DEBUG
 
-// Pruint a 3-D vector
+// Print a 3-D vector
 // NOTE:
 // Function is only defined when VECTORMATH_DEBUG is defined.
 //
 inline void print(const UVector3 & vec);
 
-// Pruint a 3-D vector and an associated string identifier
+// Print a 3-D vector and an associated string identifier
 // NOTE:
 // Function is only defined when VECTORMATH_DEBUG is defined.
 //
@@ -3623,13 +3660,13 @@ inline const uint sum(const UVector4 & vec);
 
 #ifdef VECTORMATH_DEBUG
 
-// Pruint a 4-D vector
+// Print a 4-D vector
 // NOTE:
 // Function is only defined when VECTORMATH_DEBUG is defined.
 //
 inline void print(const UVector4 & vec);
 
-// Pruint a 4-D vector and an associated string identifier
+// Print a 4-D vector and an associated string identifier
 // NOTE:
 // Function is only defined when VECTORMATH_DEBUG is defined.
 //

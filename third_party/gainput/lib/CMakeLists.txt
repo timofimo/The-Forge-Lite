@@ -37,7 +37,7 @@ if (GAINPUT_BUILD_STATIC)
 endif (GAINPUT_BUILD_STATIC)
 
 if(WIN32)
-	target_link_libraries(gainput ${XINPUT} ws2_32)
+	#target_link_libraries(gainput ${XINPUT} ws2_32)
 	target_link_libraries(gainputstatic ${XINPUT} ws2_32)
 	add_definitions(-DGAINPUT_LIB_DYNAMIC=1)
 elseif(ANDROID)

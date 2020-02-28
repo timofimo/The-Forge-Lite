@@ -1,7 +1,7 @@
 #version 450 core
 
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  * 
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -24,12 +24,15 @@
  * under the License.
 */
 
+#ifdef PREDEFINED_MACRO
+#include "stdmacro_defs.inc"
+#endif
 
 #define MAX_PLANETS 20
 
 layout(location = 0) in vec4 vs_in_position;
 
-layout (std140, set=0, binding=0) uniform uniformBlock{
+layout (std140, UPDATE_FREQ_PER_FRAME, binding=0) uniform uniformBlock{
 	uniform mat4 viewProject;
     uniform mat4 toWorld[MAX_PLANETS];
     uniform vec4 color[MAX_PLANETS];

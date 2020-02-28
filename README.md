@@ -1,14 +1,4 @@
-The-Forge-Lite is a stripped-down version of The-Forge which just supplies the renderer interface, uses CMake to build and contains the bare minimum of third-party libraries.
-
-The public interfaces also try to reduce the amount of headers needed, but TinySTL is still needed.
-
-The idea is also to keep these changes to a minimum so that it is easy and straightforward to update from ConfettiFX's [GitHub](https://github.com/ConfettiFX/The-Forge).
-
-If you are new to The-Forge, I highly recommend using the official one and not this one, it is fairly specific to my needs. However it might be useful to you if you just wanted the excellent graphics API abstraction and straightforward build process.
-
-From the official The-Forge readme:
-
-# ![The Forge Logo](Screenshots/TheForge-on-white.jpg)
+<img src="Screenshots/The Forge - Colour Black Landscape.png" width="108" height="46" />
 
 The Forge is a cross-platform rendering framework supporting
 - PC 
@@ -21,29 +11,31 @@ The Forge is a cross-platform rendering framework supporting
 - macOS / iOS / iPad OS with Metal 2.2
 - XBOX One / XBOX One X (only available for accredited developers on request)
 - PS4 / PS4 Pro (only available for accredited developers on request)
-- Switch (in development) (only available for accredited developers on request)
+- PS5 (in development) (only available for accredited developers on request)
+- Switch (only available for accredited developers on request)
 - Google Stadia (in development) (only available for accredited developers on request)
 
 Particularly, the graphics layer of The Forge supports cross-platform
-- Descriptor management
+- Descriptor management. A description is on this [Wikipage](https://github.com/ConfettiFX/The-Forge/wiki/Descriptor-Management)
 - Multi-threaded and asynchronous resource loading
 - Shader reflection
 - Multi-threaded command buffer generation
 
 The Forge can be used to provide the rendering layer for custom next-gen game engines. It is also meant to provide building blocks to write your own game engine. It is like a "lego" set that allows you to use pieces to build a game engine quickly. The "lego" High-Level Features supported on all platforms are at the moment:
-- Asynchronous Resource loading with a resource loader task system as shown in 10_PixelProjectedReflections
+- Resource Loader as shown in 10_PixelProjectedReflections, capable to load textures, buffers and geometry data asynchronously
 - [Lua Scripting System](https://www.lua.org/) - currently used in 06_Playground to load models and textures and animate the camera
 - Animation System based on [Ozz Animation System](https://github.com/guillaumeblanc/ozz-animation)
 - Consistent Math Library  based on an extended version of [Vectormath](https://github.com/glampert/vectormath) with NEON intrinsics for mobile platforms
 - Extended version of [EASTL](https://github.com/electronicarts/EASTL/)
-- For loading art assets we have a modified and integrated version of [Assimp](https://github.com/assimp/assimp)
 - Consistent Memory Managament: 
   * on GPU following [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
   * on CPU [Fluid Studios Memory Manager](http://www.paulnettle.com/)
 - Input system with Gestures for Touch devices based on an extended version of [gainput](https://github.com/jkuhlmann/gainput)
 - Fast Entity Component System based on our internally developed ECS
+- Cross-platform FileSystem C API, supporting disk-based files, memory streams, and files in zip archives
 - UI system based on [imGui](https://github.com/ocornut/imgui) with a dedicated unit test extended for touch input devices
 - Audio based on integrating [SoLoud](https://github.com/jarikomppa/soloud)
+- Shader Translator using a superset of HLSL as the shader language. There is a Wiki page on [how to use the Shader Translator](https://github.com/ConfettiFX/The-Forge/wiki/How-to-Use-The-Shader-Translator)
 - Various implementations of high-end Graphics Effects as shown in the unit tests below
 
 Please find a link and credits for all open-source packages used at the end of this readme.
@@ -53,6 +45,8 @@ alt="Twitter" width="20" height="20" border="0" /> Join the Discord channel at h
 
 <a href="https://twitter.com/TheForge_FX?lang=en" target="_blank"><img src="Screenshots/twitter.png" 
 alt="Twitter" width="20" height="20" border="0" /> Join the channel at https://twitter.com/TheForge_FX?lang=en</a>
+
+The Forge Interactive Inc. is a [Khronos member](https://www.khronos.org/members/list)
  
 
 # Build Status 
@@ -62,113 +56,103 @@ alt="Twitter" width="20" height="20" border="0" /> Join the channel at https://t
 
 # News
 
-## Release 1.31 - July 12th - Metal 2.2 | More Android Support | Discord Channel | User Group Meetings | Support for Education
-* macOS / iOS - we are now supporting Metal 2.2 on those platforms. The macOS version of the Visibility Buffer now uses primitive_id argument that allows to use indexed geometry similar to the Vulkan and DirectX 12 versions. There is a significant increase in performance and reduction in memory consumption
-  * Debug labels for buffers and textures now present in frame captures;
-  * cmdSynchronizeResources for MacOS and iOS;
-  * Minor fixes in GPU synchronization with memory barriers
-  * Minor fixes in ArgumentBuffers implementation
+## Release 1.40 - February 20th, 2020 - Resource Loader | glTF as Geometry Container | GDC Talk | User Group Meeting
+This release took much longer than expected ... :-) 
+* We are going to give a talk at GDC during the GPU Summit day. It will cover our skydome system Ephemeris 2: [GDC 2020 Ephemeris](https://twitter.com/TheForge_FX/status/1227728118883860480)
+* We will also have a user group meeting during GDC: [The Forge User Group](https://twitter.com/TheForge_FX/status/1229478866621583361)
+* A new resource loader can now stream textures, buffers and additionally geometry (extracted from glTF) asynchronously. We replaced assimp with this loader to save compile time and space on GitHub. We still use assimp for our internal tools. Here are the underlying design principles of the resource loader:
+  * Generally glTF is just a geometry container for us. We do not apply any of the underlying principles like material or mesh or scene management that it offers because they are not tailored to our needs. The resource loader only loads a glTF file, extract its geometry and stores this data (including hair and ozz animation system data) in a vertex and index buffer stream.
+  * All texture loading and material loading is the responsibility of the app. Scene partitioning or material support is not used from glTF. Those remain on the App level. Each app has its own lighting and material models and it shouldn't be restricted to the very limiting architecture of glTF
+  * There is no glTF code in any of the unit tests or app examples with the exception of the glTF viewer. The resource loader loads geometry just with a addResource call as it loads textures and buffers ... it can generate a vertex and index buffer stream with offset values for draw calls or for ExecuteIndirect ...
+* All model art assets were converted to glTF
+* libzip was replaced with [zip](https://github.com/kuba--/zip) because it is easier to maintain.
+* Console support: at the end of last year before our three week break, we made the PS4 and Switch run-times ready to ship games (we will see first games shipping this year). We also started on the PS5 and XBOX One Series X support. You need to be an acredited developer to receive the source code for any consoles. We will be asking the console owner for permission before we would provide you with any source code. That means you have to be part of their developer program.
+* Improved Windows 7 support: one of the games TF is launching with requires Windows 7 support. This means we are now testing the Windows 7 run-time more rigourously and committed fixes with this release
+* Math library: added missing vec2 functions
+* Updated copyright statement
+* Resolved issues on GitHub:
+  * issue 162 - 13_UserInterface - Crash
+  * issue 161 - 18_VirtualTexture breaks with dx and vk: only fairly decent cards support virtual textures. We added tracking support in the *.cfg system and throw an error message when the GPU doesn't support the feature.
+  * issue 124 - Missing KeyKpAdd mapping
 
-Please note that we use the early beta system and XCode versions for development. So there might some instabilities.
+## Release 1.39 - November 26th - Sparse Virtual Texture Support | Stormland
+The Forge has now support for Sparse Virtual Textures on Windows and Linux with DirectX 12 / Vulkan. Sparse texture (also known as "virtual texture", “tiled texture”, or “mega-texture”) is a technique to load huge size (such as 16k x 16k or more) textures in GPU memory.
+It breaks an original texture down into small square or rectangular tiles to load only visible part of them.
 
-Here is a screenshot: Macbook Pro 2017 with Radeon Pro 560 3360x2100 resolution
-![Visibility Buffer with Metal 2.2](Screenshots/Visibility_Buffer_macOS.png)
+The unit test 18_Virtual_Texture is using 7 sparse textures:
+* Mercury: 8192 x 4096
+* Venus: 8192 x 4096
+* Earth: 8192 x 4096
+* Moon: 16384 x 8192
+* Mars: 8192 x 4096
+* Jupiter: 4096 x 2048
+* Saturn: 4096 x 4096
 
-* Android - we increased the number of unit tests support. With this release we additionally support on the devices mentioned below:
-  * 06_MaterialPlayground
-  * 18_Playback
-  * 19_Blending
-  * 20_JoinAttachment
-  * 21_PartialBlending
-  * 22_AdditiveBlending
-  * 23_BakedPhysics
-  * 24_MultiThread
-  * 25_Skinning
-  * 26_Audio
-* Vulkan:
-  * Updated [volk Metaloader for Vulkan](https://github.com/zeux/volk) to latest
-  * The Forge supports now as the min spec for the Vulkan SDK 1.1.82.0 and as the max spec is 1.1.101.0
+There is a unit test that shows a solar system where you can approach planets with Sparse Virtual Textures attached and the resolution of the texture will increase when you approach.
 
-* Discord: we offer now also support through a discord channel. Sign up here: 
-<a href="https://discord.gg/hJS54bz" target="_blank"><img src="Screenshots/Discord.png" 
-alt="Twitter" width="20" height="20" border="0" /> Join the Discord channel at https://discord.gg/hJS54bz</a>
+Linux 1080p NVIDIA RTX 2060 Vulkan Driver version 435
 
-* User Group Meetings - there will be a user group meeting during GDC. In case you want to organize a user group meeting in your country / town at any other point in time, we would like to support this. We could send an engineer for a talk.
-* Support for Education - in case your School / College / University uses The Forge for education, we would like to support this as well. We could send an engineer or help create material. So far the following schools use The Forge for teaching:
+![Sparse Virtual Texture on Linux Vulkan](Screenshots/Virtual_Texture_Linux.png) 
 
-[Breda University of Applied Sciences](https://www.buas.nl) 
-```
-        Contact:
-        Jeremiah van Oosten 
-        Monseigneur Hopmansstraat 1
-        4817 JT Breda
- ```
-[Ontario Tech University](https://uoit.ca/) 
-```
-        Contact:
-        Andrew Hogue
-        Ontario Tech University
-        SIRC 4th floor
-        2000 Simcoe St N
-        Oshawa, ON, L1H 7K4
- ```
-* Writing Guidelines - For contributions to The Forge we apply the following writing guidelines:
-  * We limit now all code to C++ 11 by setting the Clang and other compiler flags
-  * We follow the [Orthodox C++ guidelines] (https://gist.github.com/bkaradzic/2e39896bc7d8c34e042b) minus C++ 14 support (see above)
+Windows 10 1080p AMD RX550 DirectX 12 Driver number: Adrenaline software 19.10.1
+
+![Sparse Virtual Texture on Windows 10 DirectX 12](Screenshots/Virtual_Texture.png) 
+
+Windows 10 1080p NVIDIA 1080 Vulkan Driver number: 418.81
+
+![Sparse Virtual Texture on Windows Vulkan](Screenshots/Virtual_Texture_VULKAN_1920_1080_GTX1080.png) 
+
+![Sparse Virtual Texture on Windows Vulkan](Screenshots/Virtual_Texture_VULKAN_1920_1080_GTX1080_CloseUP.png) 
 
 
+Ephemeris 2 - the game Stormland from Insomniac was released. This game is using a custom version of Ephemeris 2. We worked for more than six months on this project.
 
-## Release 1.30 - June 28th, 2019 - Ephemeris 2 - New Skydome System | Android Unit Tests | New Entity Component System | SoLoud Audio 
- * Ephemeris 2: this is a new volumetric skydome system developed for PS4 / XBOX One class of hardware. Click on the image to watch a video:
+![Stormland](Screenshots/Stormland/Capture_2019_11_15_08_43_35_881.png) 
 
- [![Ephemeris 2](Screenshots/Ephemeris2.png)](https://vimeo.com/344675521)
+![Stormland](Screenshots/Stormland/Capture_2019_11_15_08_43_21_794.png) 
 
- For Ephemeris and the rest of our commercial custom middleware there is now a new GitHub repository here [Custom-Middleware](https://github.com/ConfettiFX/Custom-Middleware) 
+![Stormland](Screenshots/Stormland/Capture_2019_11_15_08_42_52_603.png) 
 
- We also have a skydome system for mobile hardware called Ephemeris 1, that will be released on GitHub later.
+![Stormland](Screenshots/Stormland/Capture_2019_11_15_08_42_19_713.png) 
 
- * Android: we are supporting now more and more unit tests in Android by improving the run-time support. Here are screenshots:
+![Stormland](Screenshots/Stormland/Capture_2019_11_15_08_42_09_931.png) 
 
-01_Transformations
- ![01_Transformations](Screenshots/Screenshot_20190620-060535_Transformation.jpg)
+![Stormland](Screenshots/Stormland/Capture_2019_11_15_08_41_47_994.png) 
 
-02_Compute
-![02_Compute](Screenshots/Screenshot_20190620-060638_Compute.jpg)
+![Stormland](Screenshots/Stormland/Capture_2019_11_15_08_41_38_457.png) 
 
-05_FontRendering
-![05_FontRendering](Screenshots/Screenshot_20190620-061732_FontRendering.jpg)
+Head over to [Custom Middleware](https://github.com/ConfettiFX/Custom-Middleware) to check out the source code.
 
-09_LightAndShadow
-![09_LightAndShadow](Screenshots/09_LightAndShadow_Android.jpg)
+## Release 1.38 - November 14th - Cross-Platform Path Tracer
+- The new 16_Raytracing unit test shows a simple cross-platform path tracer. On iOS this path tracer requires A11 or higher. It is meant to be used in tools in the future and doesn't run in real-time.
+To support the new path tracer, the Metal raytracing backend has been overhauled to use a sort-and-dispatch based approach, enabling efficient support for multiple hit groups and miss shaders. The most significant limitation for raytracing on Metal is that only tail recursion is supported, which can be worked around using larger per-ray payloads and splitting up shaders into sub-shaders after each TraceRay call; see the Metal shaders used for 16_Raytracing for an example on how this can be done.
 
-13_imGUI
-![13_imGuI](Screenshots/13_imGUI_Android.jpg)
+macOS 1920x1080 AMD Pro Vega 64
 
-17_EntityComponentSystem
-![17_EntityComponentSystem](Screenshots/Screenshot_20190620-060737_EntityComponentSystem.jpg)
+![Path Tracer running on macOS](Screenshots/16_Path_Tracer_macOS.png)
 
- We added the Samsung S10 Galaxy phone (Qualcomm Adreno 640 Graphics Card (Vulkan 1.1.87)) to the test devices for Android. 
+iOS iPhone X 812x375
 
- * ENTT: we decided to remove ENTT and replace it with our own ECS system that we use internally for tools. ENTT in debug is too slow for practical usage because it decreases execution speed and increases compile times substantially. It appears that "modern C++ 17" and probably also "modern C++ 14" is not ready for usage in a team environment because it decreases productivity too much. We tried to remove C++ 17 and 14 features to make it run faster but it ended up too much work. We went from more than 200 ms with ENTT to 60 ms with our own ECS running a Debug build on a Intel Core i7-6700T 2.8GHz. In release our own system is in the moment not as fast as ENTT but we will fix that.
+![Path Tracer running on macOS](Screenshots/16_Path_Tracer_iOS.jpeg)
 
- * Audio: we did a first pass on integrating [SoLoud](https://github.com/jarikomppa/soloud) for all our platforms. There is a new unit test:
+Windows 10 1080p NVIDIA RTX 2080 with DXR Driver version 441.12
 
-![26_Audio](Screenshots/26_Audio.png)
- 
- * Linux: following STEAM, we are switching to the Mesa RADV driver in our test environment for AMD GPUs. For NVIDIA GPUs we are still using the NVIDIA driver.
+![Path Tracer running on Windows DXR](Screenshots/16_Path_Tracer_DXR.png)
 
- * Texture Asset pipeline: we did a first pass on a unified texture asset pipeline. On the app level only the name of the texture needs to be provided and then depending on the underlying platform it will attempt to load the "optimal compressed" texture, which in the moment is either KTX or dds. In the future there will be Google Basis support as well.
-   * Removed support for various non-optimal texture file formats - png, jpg, tga, hdr, exr
-   * Add ASTC support for iOS through KTX container
-   * Add compressed textures for all unit test resources
-   * Add BC6H signed and unsigned float variants
-   
-  Please make sure you download the art asset zip file again with the help of the batch file.
+Windows 10 1080p NVIDIA RTX 2080 with RTX Driver version 441.12
 
-* Issue list:
-   * issue #109 "Texture updates broken" is fixed now
-   * NVIDIA GTX 1660 bug: this card with the Vulkan run-time and driver 419.35 became unresponsive, while the DirectX 12 run-time works as expected. Any other NVIDIA GPU works fine ... this looks like a driver bug ...
+![Path Tracer running on Windows RTX](Screenshots/16_Path_Tracer_RTX.png)
 
+Linux 1080p NVIDIA RTX 2060 with RTX Driver version 435
+
+![Path Tracer running on Linux RTX](Screenshots/16_Path_Tracer_Linux_RTX.png)
+
+
+- File System: Fixed an issue wherein compiled shader binaries weren’t being saved to the RD_SHADER_BINARIES resource directory
+- GitHub issues fixed:
+  * #150 - [Vulkan] Failed to extend descriptor pool
+  * #151 - [Vulkan] rootcbv of detection is case sensitive
+  * #152 - [Vulkan] updateDescriptorSet is different from the DirectX12
 
 See the release notes from previous releases in the [Release section](https://github.com/ConfettiFX/The-Forge/releases).
 
@@ -183,7 +167,7 @@ See the release notes from previous releases in the [Release section](https://gi
 3. Visual Studio 2017 with Windows SDK / DirectX version 17763.132 (you need to get it via the Visual Studio Intaller)
 https://developer.microsoft.com/en-us/windows/downloads/sdk-archive
 
-4. The Forge supports now as the min spec for the Vulkan SDK 1.1.82.0 and as the max spec is  [1.1.101.0](https://vulkan.lunarg.com/sdk/home)
+4. The Forge supports now as the min spec for the Vulkan SDK 1.1.82.0 and as the max spec  [1.1.114](https://vulkan.lunarg.com/sdk/home)
 
 6. The Forge is currently tested on 
 * AMD 5x, VEGA GPUs (various)
@@ -193,9 +177,9 @@ https://developer.microsoft.com/en-us/windows/downloads/sdk-archive
 
 # macOS Requirements:
 
-1. macOS 10.15 Beta (19A487m)
+1. macOS 10.15 beta 8 (19A558d)
 
-2. Xcode 11.0 beta 2 (11M337n)
+2. Xcode 11.0 (11A419c)
 
 3. The Forge is currently tested on the following macOS devices:
 * iMac with AMD RADEON 560 (Part No. MNDY2xx/A)
@@ -209,7 +193,7 @@ We will not test any Hackintosh configuration.
 
 # iOS Requirements:
 
-1. iOS 13 beta 
+1. iOS 13.1 beta 3 (17A5837a)
 
 2. XCode: see macOS
 
@@ -222,7 +206,7 @@ We are currently testing on
 
 # iPad OS Requirements:
 
-1. iPad OS beta 2 
+1. iPadOS 13.1 beta 3 (17A5837a)
 
 2. XCode: see macOS
 
@@ -253,7 +237,20 @@ We are currently testing on:
 
 1. Android Phone with Android Pie (9.x) for Vulkan 1.1 support
 
-2. Android Studio with API level 28 
+2. Visual Studio 2017 with support for Android API level 28
+
+At the moment, the Android run-time does not support the following unit tests due to -what we consider- driver bugs:
+* 04_ExecuteIndirect
+* 07_Tesselation 
+* 08_Procedural
+* 09a_HybridRayTracing
+* 10_PixelProjectedReflections
+* 12_RendererRuntimeSwitch
+* 14_WaveIntrinsics
+* 15_Transparency 
+* 16_RayTracing 
+* 16a_SphereTracing
+* Visibility Buffer 
 
 3. We are currently testing on 
 * [Samsung S10 Galaxy (Qualcomm Adreno 640 Graphics Cardv(Vulkan 1.1.87))](https://www.samsung.com/us/mobile/galaxy-s10/) with Android 9.0. Please note this is the version with the Qualcomm based chipset.
@@ -332,22 +329,76 @@ This unit test showcases the rendering of grass with the help of hardware tessel
 
 ![Image of the Hardware Tessellation Unit test](Screenshots/07_Hardware_Tessellation.PNG)
 
-## 8. Procedural 
-In the spirit of the shadertoy examples this unit test shows a procedurally generated planet.
+## 8. glTF Model Viewer
+A cross-platform glTF model viewer that optimizes the vertex and index layout for the underlying platform and picks the right texture format for the underlying platform. We integrated Arseny Kapoulkine @zeuxcg excellent [meshoptimizer](https://github.com/zeux/meshoptimizer) and use the same PBR as used in the Material Playground unit test.
+This modelviewer can also utilize Binomials [Basis Universal Texture Support](https://github.com/binomialLLC/basis_universal) as an option to load textures. Support was added to the Image class as a "new image format". So you can pick basis like you can pick DDS or KTX. For iOS / Android we go directly to ASTC because Basis doesn't support ASTC at the moment.
 
-![Image of the Procedural Unit test](Screenshots/08_Procedural.PNG)
+glTF model viewer running on iPad with 2048x1536 resolution
+
+![glTF model viewer](Screenshots/ModelViewer/Metal_a1893_ipad_6th_gen_2048x1536_0.PNG)
+
+![glTF model viewer](Screenshots/ModelViewer/Metal_a1893_ipad_6th_gen_2048x1536_1.PNG)
+
+glTF model viewer running on Samsung Galaxy S10 with Vulkan with 1995x945 resolution
+
+![glTF model viewer](Screenshots/ModelViewer/Vulkan_Samsung_GalaxyS10_1995x945_0.JPEG)
+
+![glTF model viewer](Screenshots/ModelViewer/Vulkan_Samsung_GalaxyS10_1995x945_1.JPEG)
+
+glTF model viewer running on Ubuntu AMD RX 480 with Vulkan with 1920x1080 resolution
+
+![glTF model viewer](Screenshots/ModelViewer/Vulkan_Ubuntu_RX480_1920x1080_0.png)
+
+![glTF model viewer](Screenshots/ModelViewer/Vulkan_Ubuntu_RX480_1920x1080_1.png)
 
 ## 9. Light and Shadow Playground
 This unit test shows various shadow and lighting techniques that can be chosen from a drop down menu. There will be more in the future.
 
-iMac with AMD RADEON 580 (Part No. MNED2xxA) with resolution of 5120x2880:
-![Light & Shadow Playground](Screenshots/09_LightShadowPlayground.png)
+ * Exponential Shadow Map - this is based on [Marco Salvi's](https://pixelstoomany.wordpress.com/category/shadows/exponential-shadow-maps/) @marcosalvi papers. This technique filters out the edge of the shadow map by approximating the shadow test using exponential function that involves three subjects: the depth value rendered by the light source, the actual depth value that is being tested against, and the constant value defined by the user to control the softness of the shadow
+  * Adaptive Shadow Map with Parallax Correction Cache - this is based on the article "Parallax-Corrected Cached Shadow Maps" by Pavlo Turchyn in [GPU Zen 2](https://gpuzen.blogspot.com/2019/05/gpu-zen-2-parallax-corrected-cached.htm). It adaptively chooses which light source view to be used when rendering a shadow map based on a hiearchical grid structure. The grid structure is constantly updated depending on the user's point of view and it uses caching system that only renders uncovered part of the scene. The algorithm greatly reduce shadow aliasing that is normally found in traditional shadow map due to insufficient resolution. Pavlo Turchyn's paper from GPU Pro 2 added an additional improvement by implementing multi resolution filtering, a technique that approximates larger size PCF kernel using multiple mipmaps to achieve cheap soft shadow. He also describes how he integrated a Parallax Correction Cache to Adaptive Shadow Map, an algorithm that approximates moving sun's shadow on static scene without rendering tiles of shadow map every frame. The algorithm is generally used in an open world game to approximate the simulation of day & night’s shadow cycle more realistically without too much CPU/GPU cost.
+  * Signed Distance Field Soft Shadow - this is based on [Daniel Wright's Siggraph 2015](http://advances.realtimerendering.com/s2015/DynamicOcclusionWithSignedDistanceFields.pdf) @EpicShaders presentation. To achieve real time SDF shadow, we store the distance to the nearest surface for every unique Meshes to a 3D volume texture atlas. The Mesh SDF is generated offline using triangle ray tracing, and half precision float 3D volume texture atlas is accurate enough to represent 3D meshes with SDF. The current implementation only supports rigid meshes and uniform transformations (non-uniform scale is not supported). An approximate cone intersection can be achieved  by measuring the closest distance of a passed ray to an occluder which gives us a cheap soft shadow when using SDF.
 
-iPhone 7 iOS 12.1.4 (16D57) with a resolution of 1334x750:
-![Light & Shadow Playground](Screenshots/09_LightShadowPlayground_iOS.png)
+To achieve  high-performance, the playground runs on our signature rendering architecture called Triangle Visibility Buffer. The step that generates the SDF data also uses this architecture.
 
-Linux Ubuntu 18.04.1 LTS Vulkan 1.1.92 RADEON 480 Driver 18.30 with a resolution of 1920x1080:
-![Light & Shadow Playground](Screenshots/09_LightShadowPlayground_Linux.png)
+Click on the following screenshot to see a movie:
+
+[![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_Visualize.png)](https://vimeo.com/352985038)
+
+The following PC screenshots are taken on Windows 10 with a AMD RX550 GPU (driver 19.7.1) with a resolution of 1920x1080. 
+
+Exponential Shadow Maps:
+
+![Light and Shadow Playground - Exponential Shadow Map](Screenshots/LightNShadowPlayground/ExponentialShadowMap.png)
+
+Adaptive Shadow Map with Parallax Correction Cache
+
+![Adaptive Shadow Map with Parallax Correction Cache](Screenshots/LightNShadowPlayground/ASM_Two.png)
+
+Signed Distance Field Soft Shadow:
+
+![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_1.png)
+
+Signed Distance Field Soft Shadows - Debug Visualization
+
+![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_Visualize.png)
+
+The following shots show Signed Distance Field Soft Shadows running on iMac with a AMD RADEON Pro 580
+
+![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_macOS_1.png)
+
+![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_macOS_2.png)
+
+The following shots show Signed Distance Field Soft Shadows running on XBOX One:
+
+![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_XBOX_1.png)
+
+![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_XBOX_2.png)
+
+![Signed Distance Field Soft Shadow Map](Screenshots/LightNShadowPlayground/SDF_XBOX_3.png)
+
+Readme for Signed Distance Field Soft Shadow Maps:
+
+To generate the SDF Mesh data you should select “Signed Distance Field” as the selected shadow type in the Light and Shadow Playground. There is a button called “Generate Missing SDF” and once its clicked, it shows a progress bar that represents the remaining SDF mesh objects utilized for SDF data generation. This process is multithreaded, so the user can still move around the scene while waiting for the SDF process to be finished. This is a long process and it could consume up to 8+ hours depending on your CPU specs. To check how many SDF objects there are presently in the scene, you can mark the checkbox "Visualize SDF Geometry On The Scene".
 
 ## 9a. Hybrid Ray-Traced Shadows
 This unit test was build by Kostas Anagnostou @KostasAAA to show how to ray trace shadows without using a ray tracing API like DXR / RTX. It should run on all GPUs (not just NVIDIA RTX GPUs) and the expectation is that it should run comparable with a DXR / RTX based version even on a NVIDIA RTX GPU. That means the users of your game do not have to buy a NVIDIA RTX GPU to enjoy HRT shadows :-)
@@ -364,10 +415,12 @@ This unit test shows a typical VR Multi-GPU configuration. One eye is rendered b
 
 ![Image of the Multi-GPU Unit test](Screenshots/11_MultiGPU.png)
 
-## 12. The Forge switching between Vulkan and DirectX 12 during Run-time (Windows PC-only)
-This unit test shows how to switch between the Vulkan and DirectX 12 graphics API during run-time. 
-
-![Image of the The Forge Switching Unit test](Screenshots/12_TheForgeInDLL.png)
+## 12. File System Test
+This unit test showcases a cross-platform FileSystem C API, supporting disk-based files, memory streams, and files in zip archives. The API can be viewed in [IFileSystem.h](/Common_3/OS/Interfaces/IFileSystem.h), and all of the example code has been updated to use the new API.
+   * The API is based around `Path`s, where each `Path` represents an absolute, canonical path string on a particular file system. You can query information about the files at `Path`s, open files as `FileStream`s, and copy files between different `Path`s.
+   * The concept of `FileSystemRoot`s has been replaced by `ResourceDirectory`s. `ResourceDirectory`s are predefined directories where resources are expected to exist, and there are convenience functions to open files in resource directories. If your resources don’t exist within the default directory for a particular resource type, you can call `fsSetPathForResourceDirectory` to relocate the resource directory; see the unit tests for sample code on how to do this.
+   
+![File System Unit Test](Screenshots/12_FileSystem.png)
 
 ## 13. imGUI integration unit test
 This unit test shows how the integration of imGui with a wide range of functionality.
@@ -390,20 +443,29 @@ This unit test shows how to use the new wave intrinsics. Supporting Windows with
 
 ![Image of the Wave Intrinsics unit test in The Forge](Screenshots/15_WaveIntrinsics.png)
 
-## 16. Ray Tracing Unit Test
-Ray Tracing API unit test, showing how the cross-platfrom Ray Tracing Interface running on Windows, Ubuntu with Vulkan RTX, macOS and iOS
+## 16. Path Tracer - Ray Tracing Unit Test
+The new 16_Raytracing unit test shows a simple cross-platform path tracer. On iOS this path tracer requires A11 or higher. It is meant to be used in tools in the future and doesn't run in real-time.
+To support the new path tracer, the Metal raytracing backend has been overhauled to use a sort-and-dispatch based approach, enabling efficient support for multiple hit groups and miss shaders. The most significant limitation for raytracing on Metal is that only tail recursion is supported, which can be worked around using larger per-ray payloads and splitting up shaders into sub-shaders after each TraceRay call; see the Metal shaders used for 16_Raytracing for an example on how this can be done.
 
-PC Windows 10 RS5, DirectX12, GeForce RTX 2070, Driver version 418.81 1080p:
-![Ray Tracing on PC With DXR](Screenshots/16_RayTrace_Windows_DXR.png)
+macOS 1920x1080 AMD Pro Vega 64
 
-PC Ubuntu Vulkan RTX, GeForce RTX 2070, Driver Version 418.56 1080p
-![Ray Tracing on PC Ubuntu with Vulkan RTX](Screenshots/16_RayTrace_Linux_Vulkan.png)
+![Path Tracer running on macOS](Screenshots/16_Path_Tracer_macOS.png)
 
-Mac Mini with Intel Core i5 3GHz cpu with integrated graphics Intel UHD Graphics 630 (Part No. MRTT2RU/A) with resolution 3440x1440:
-![Ray Tracing on macOS](Screenshots/RayTracing_macOS.png)
+iOS iPhone X 812x375
 
-iPad 6th Generation iOS 12.1.3 (16D39) with a resolution of 2048x1536
-![Ray Tracing on iOS](Screenshots/RayTracing_iPad.png)
+![Path Tracer running on macOS](Screenshots/16_Path_Tracer_iOS.jpeg)
+
+Windows 10 1080p NVIDIA RTX 2080 with DXR Driver version 441.12
+
+![Path Tracer running on Windows DXR](Screenshots/16_Path_Tracer_DXR.png)
+
+Windows 10 1080p NVIDIA RTX 2080 with RTX Driver version 441.12
+
+![Path Tracer running on Windows RTX](Screenshots/16_Path_Tracer_RTX.png)
+
+Linux 1080p NVIDIA RTX 2060 with RTX Driver version 435
+
+![Path Tracer running on Linux RTX](Screenshots/16_Path_Tracer_Linux_RTX.png)
 
 ## 16a. Sphere Tracing
 This unit test was originally posted on ShaderToy by [Inigo Quilez](https://www.shadertoy.com/view/Xds3zN) and [Sopyer](https://sopyer.github.io/b/post/vulkan-shader-sample/). It shows how a scene is ray marched with shadows, reflections and AO
@@ -415,52 +477,89 @@ This unit test shows how to use the high-performance entity component system in 
 
 ![Image of the Entity Component System unit test in The Forge](Screenshots/17_EntityComponentSystem.png)
 
+## 18. Sparse Virtual Textures
+The Forge has now support for Sparse Virtual Textures on Windows and Linux with DirectX 12 / Vulkan. Sparse texture (also known as "virtual texture", “tiled texture”, or “mega-texture”) is a technique to load huge size (such as 16k x 16k or more) textures in GPU memory.
+It breaks an original texture down into small square or rectangular tiles to load only visible part of them.
 
-## 18. Ozz Playback Animation
+The unit test 18_Virtual_Texture is using 7 sparse textures:
+* Mercury: 8192 x 4096
+* Venus: 8192 x 4096
+* Earth: 8192 x 4096
+* Moon: 16384 x 8192
+* Mars: 8192 x 4096
+* Jupiter: 4096 x 2048
+* Saturn: 4096 x 4096
+
+There is a unit test that shows a solar system where you can approach planets with Sparse Virtual Textures attached and the resolution of the texture will increase when you approach.
+
+Linux 1080p NVIDIA RTX 2060 with RTX Driver version 435
+
+![Sparse Virtual Texture on Linux Vulkan](Screenshots/Virtual_Texture_Linux.png) 
+
+Windows 10 1080p NVIDIA 1080 DirectX 12
+
+![Sparse Virtual Texture on Windows 10 DirectX 12](Screenshots/Virtual_Texture.png) 
+
+Windows 10 1080p NVIDIA 1080 Vulkan
+
+![Sparse Virtual Texture on Windows Vulkan](Screenshots/Virtual_Texture_VULKAN_1920_1080_GTX1080.png) 
+
+![Sparse Virtual Texture on Windows Vulkan](Screenshots/Virtual_Texture_VULKAN_1920_1080_GTX1080_CloseUP.png) 
+
+
+## 21. Ozz Playback Animation
 This unit test shows how to playback a clip on a rig.
 
 ![Image of Playback Animation in The Forge](Screenshots/01_Playback.gif)
 
-## 19. Ozz Playback Blending
+## 22. Ozz Playback Blending
 This unit test shows how to blend multiple clips and play them back on a rig.
 
 ![Image of Playback Blending in The Forge](Screenshots/02_Blending.gif)
 
-## 20. Ozz Joint Attachment
+## 23. Ozz Joint Attachment
 This unit test shows how to attach an object to a rig which is being posed by an animation.
 
 ![Image of Ozz Joint Attachment in The Forge](Screenshots/03_JointAttachment.gif)
 
-## 21. Ozz Partial Blending
+## 24. Ozz Partial Blending
 This unit test shows how to blend clips having each only effect a certain portion of joints.
 
 ![Image of Ozz Partial Blending in The Forge](Screenshots/04_PartialBlending.gif)
 
-## 22. Ozz Additive Blending
+## 25. Ozz Additive Blending
 This unit test shows how to introduce an additive clip onto another clip and play the result on a rig.
 
 ![Image of Ozz Additive Blending in The Forge](Screenshots/05_Additive.gif)
 
-## 23. Ozz Baked Physics
+## 26. Ozz Baked Physics
 This unit test shows how to use a scene of a physics interaction that has been baked into an animation and play it back on a rig.
 
 ![Image of Ozz Baked Physics in The Forge](Screenshots/07_BakedPhysics.gif)
 
-## 24. Ozz Multi Threading
+## 27. Ozz Multi Threading
 This unit test shows how to animate multiple rigs simultaneously while using multi-threading for the animation updates.
 
 ![Image of Ozz Multi Threading in The Forge](Screenshots/09_MultiThread.gif)
 
-## 25. Ozz Skinning
+## 28. Ozz Skinning
 This unit test shows how to use skinning with Ozz
 
 ![Image of the Ozz Skinning unit test](Screenshots/Skinning_PC.gif)
 
-## 26. Audio Integration of SoLoud
+## 29. Ozz Inverse Kinematic
+This unit test shows how to use a Aim and a Two bone IK solvers
+
+Aim IK
+![Ozz Aim IK](Screenshots/Ozz_Aim_IK.gif)
+
+Two Bone IK
+![Ozz Two Bone IK](Screenshots/Ozz_two_bone_ik.gif)
+
+## 31. Audio Integration of SoLoud
 We integrated SoLoad. Here is a unit test that allow's you make noise ...
 
-![26_Audio](Screenshots/26_Audio.png)
-
+![Audio Integration](Screenshots/26_Audio.png)
 
 
 # Examples
@@ -473,45 +572,35 @@ There is an example implementation of the Triangle Visibility Buffer as covered 
 Below are screenshots and descriptions of some of the tools we integrated.
 
 ## Microprofiler
-We integrated the [Micro Profiler](https://github.com/zeux/microprofile) into our code base. 
+We integrated the [Micro Profiler](https://github.com/zeux/microprofile) into our code base by replacing the proprietary UI with imGUI and simplified the usage. Now it is much more tightly and consistently integrated in our code base.
 
-![Microprofiler in Visibility Buffer](Screenshots/MicroProfileExampleVisibilityBuffer.png)
+Here are screenshots of the Microprofiler running the Visibility Buffer on PC:
 
-![Microprofiler in Visibility Buffer](Screenshots/MicroProfileExampleVisibilityBuffer2.png)
+![Microprofiler](Screenshots/MicroProfiler/VB_Detailed.png)
 
-To enable/disable profiling, go to file ProfileEnableMacro.h line 9 and set it
-to 0(disabled) or 1(enabled). 
-It's supported on the following platforms:
- - Windows
- - Linux
- - macOS (GPU profiling is disabled)
- - iOS (GPU profiling is disabled)
- - Android 
+![Microprofiler](Screenshots/MicroProfiler/VB_Plot.PNG)
 
-MicroProfile provides us an easy to use UI and visualization our frame.
+![Microprofiler](Screenshots/MicroProfiler/VB_Timer.PNG)
 
-How to use it:
-MicroProfile has different display modes. The most useful one when running inside
-the application is Timers. We can change the display mode going to Mode and right
-clicking the one we want.
+![Microprofiler](Screenshots/MicroProfiler/VB_Timer_2.PNG)
 
-If we are on Timer, we will be able to right click on the labels. This will enable
-a graph at the bottom left.
+Here are screenshots of the Microprofiler running a unit test on iOS:
 
-If we wanted to just see some of the groups inside the profile display, go to Groups
-and select the ones you want.
+![Microprofiler](Screenshots/MicroProfiler/IMG_0004_iOS.PNG)
 
-The other options are self explanatory.
+![Microprofiler](Screenshots/MicroProfiler/IMG_0005_iOS.PNG)
 
-If the user wants to dump the profile to a file, we just need to go to dump,
-and right click on the amount of frames we want. This generates a html file in the
-executable folder. Open it with your prefered web browser to have a look.
+![Microprofiler](Screenshots/MicroProfiler/IMG_0006_iOS.PNG)
 
-Dumping is useful, because we will be able to see the profile frame by frame,
-without it being updated every frame. This will be useful when displaying in Detailed
-mode.
+Check out the [Wikipage](https://github.com/ConfettiFX/The-Forge/wiki/Microprofiler---How-to-Use) for an explanation on how to use it.
 
-For any doubt on the use of the MicroProfile, hover Help.
+## Shader Translator
+We provide a shader translator, that translates one shader language -a superset of HLSL called Forge Shader Language (FLS) - to the target shader language of all our target platforms. That includes the console and mobile platforms as well.
+We expect this shader translator to be an easier to maintain solution for smaller game teams because it allows to add additional data to the shader source file with less effort. Such data could be for example a bucket classification or different shaders for different capability levels of the underlying platform, descriptor memory requirements or resource memory requirements in general, material info or just information to easier pre-compile pipelines.
+The actual shader compilation will be done by the native compiler of the target platform.
+
+ [How to use the Shader Translator](https://github.com/ConfettiFX/The-Forge/wiki/How-to-Use-The-Shader-Translator)
+
 
 
 # Releases / Maintenance
@@ -568,8 +657,6 @@ In case your School / College / University uses The Forge for education, we woul
 
 # Open-Source Libraries
 The Forge utilizes the following Open-Source libraries:
-* [Assimp](https://github.com/assimp/assimp)
-* [Bullet Physics](https://github.com/bulletphysics)
 * [Fontstash](https://github.com/memononen/fontstash)
 * [Vectormath](https://github.com/glampert/vectormath)
 * [Nothings](https://github.com/nothings/stb) single file libs 
@@ -595,6 +682,8 @@ The Forge utilizes the following Open-Source libraries:
 * [Micro Profiler](https://github.com/zeux/microprofile)
 * [MTuner](https://github.com/milostosic/MTuner) 
 * [EASTL](https://github.com/electronicarts/EASTL/)
-* [enkiTS](https://github.com/dougbinks/enkiTS)
 * [SoLoud](https://github.com/jarikomppa/soloud)
-
+* [meshoptimizer](https://github.com/zeux/meshoptimizer)
+* [Basis Universal Texture Support](https://github.com/binomialLLC/basis_universal)
+* [TinyImageFormat](https://github.com/DeanoC/tiny_imageformat)
+* [zip](https://github.com/kuba--/zip)

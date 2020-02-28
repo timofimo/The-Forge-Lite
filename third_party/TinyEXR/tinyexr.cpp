@@ -39,11 +39,11 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "EASTL/string.h"
-#include "EASTL/unordered_set.h"
-#include "EASTL/unordered_map.h"
-#include "EASTL/vector.h"
-#include "EASTL/heap.h"
+#include "../EASTL/string.h"
+#include "../EASTL/unordered_set.h"
+#include "../EASTL/unordered_map.h"
+#include "../EASTL/vector.h"
+#include "../EASTL/heap.h"
 
 #include "tinyexr.h"
 

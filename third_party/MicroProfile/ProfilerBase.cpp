@@ -3,7 +3,7 @@
 
 #if PROFILE_ENABLED
 
-#include "GpuProfiler.h"
+#include "Renderer/GpuProfiler.h"
 #include "Interfaces/IFileSystem.h"
 #include <algorithm>
 
@@ -38,9 +38,11 @@ int64_t ProfileGetTick()
 #include <stdio.h>
 #include <stdarg.h>
 #include <math.h>
-#include <algorithm>
+//#include <algorithm>
 
-
+//EASTL Includes
+#include "../EASTL/sort.h"
+#include "../EASTL/algorithm.h"
 
 #if PROFILE_WEBSERVER
 
@@ -1738,15 +1740,12 @@ int ProfileFormatCounter(int eFormat, int64_t nCounter, char* pOut, uint32_t nBu
 	return nLen;
 }
 
-void ProfileDumpFile(const char* pPath, ProfileDumpType eType, uint32_t nFrames)
+void ProfileDumpFile(const Path* pPath, ProfileDumpType eType, uint32_t nFrames)
 {
 	Profile & S = g_Profile;
-	size_t nLen = strlen(pPath);
-	if (nLen > sizeof(S.DumpPath) - 1)
-	{
-		return;
-	}
-	memcpy(S.DumpPath, pPath, nLen + 1);
+	
+	fsFreePath(S.DumpPath);
+	S.DumpPath = fsCopyPath(pPath);
 	S.nDumpFileNextFrame = 1;
 	S.eDumpType = eType;
 	S.nDumpFrames = nFrames;
@@ -2389,14 +2388,14 @@ void ProfileDumpHtml(ProfileWriteCallback CB, void* Handle, int nMaxFrames, cons
 	{
 		nTimerCounterSort[i] = i;
 	}
-	std::sort(nGroupCounterSort, nGroupCounterSort + S.nGroupCount,
+	eastl::sort(nGroupCounterSort, nGroupCounterSort + S.nGroupCount,
 		[nGroupCounter](const uint32_t l, const uint32_t r)
 	{
 		return nGroupCounter[l] > nGroupCounter[r];
 	}
 	);
 
-	std::sort(nTimerCounterSort, nTimerCounterSort + S.nTotalTimers,
+	eastl::sort(nTimerCounterSort, nTimerCounterSort + S.nTotalTimers,
 		[nTimerCounter](const uint32_t l, const uint32_t r)
 	{
 		return nTimerCounter[l] > nTimerCounter[r];
@@ -2435,24 +2434,26 @@ void ProfileDumpHtml(ProfileWriteCallback CB, void* Handle, int nMaxFrames, cons
 
 void ProfileWriteFile(void* Handle, size_t nSize, const char* pData)
 {
-	fwrite(pData, nSize, 1, (FILE*)Handle);
+	fsWriteToStream((FileStream*)Handle, pData, nSize);
 }
 
 void ProfileDumpToFile()
 {
 	std::lock_guard<std::recursive_mutex> Lock(ProfileMutex());
 	Profile & S = g_Profile;
+	
+    FileStream* fh = fsOpenFile(S.DumpPath, FM_WRITE);
 
-	File file;
-	if(file.Open(S.DumpPath, FileMode::FM_Write, FSRoot::FSR_Absolute))
+	if (fh)
 	{
 		if (S.eDumpType == ProfileDumpTypeHtml)
-			ProfileDumpHtml(ProfileWriteFile, file.GetHandle(), S.nDumpFrames, 0);
+			ProfileDumpHtml(ProfileWriteFile, fh, S.nDumpFrames, 0);
 		else if (S.eDumpType == ProfileDumpTypeCsv)
-			ProfileDumpCsv(ProfileWriteFile, file.GetHandle(), S.nDumpFrames);
+			ProfileDumpCsv(ProfileWriteFile, fh, S.nDumpFrames);
 
-		file.Close();
+        fsCloseStream(fh);
 	}
+
 }
 
 #if PROFILE_WEBSERVER
@@ -2987,8 +2988,10 @@ void ProfileTraceThread(void* unused)
 	Profile & S = g_Profile;
 	while (!S.bContextSwitchStop)
 	{
-		File file;
-		if (!file.Open("\\\\.\\pipe\\microprofile-contextswitch", FileMode::FM_WriteBinary, FSRoot::FSR_Absolute))
+		PathHandle path = fsCreatePath(fsGetSystemFileSystem(), "\\\\.\\pipe\\microprofile-contextswitch");
+		FileStream* fh = fsOpenFile(path, FM_WRITE_BINARY);
+	
+		if(!fh)
 		{
 			Sleep(1000);
 			continue;
@@ -2997,15 +3000,15 @@ void ProfileTraceThread(void* unused)
 		S.bContextSwitchRunning = true;
 
 		ProfileContextSwitch Buffer[1024];
-		while (!ferror(static_cast<FILE *>(file.GetHandle())) && !S.bContextSwitchStop)
+		while (!fsStreamAtEnd(fh) && !S.bContextSwitchStop)
 		{
-			size_t nCount = file.Read(Buffer, sizeof(ProfileContextSwitch) * ARRAYSIZE(Buffer));
+			size_t nCount = fsReadFromStream(Buffer, sizeof(ProfileContextSwitch) * ARRAYSIZE(Buffer));
 
 			for (size_t i = 0; i < nCount; ++i)
 				ProfileContextSwitchPut(&Buffer[i]);
 		}
 
-		file.Close();
+		fsCloseStream(fh);
 
 		S.bContextSwitchRunning = false;
 	}
@@ -3034,8 +3037,10 @@ void ProfileTraceThread(void*)
 	Profile & S = g_Profile;
 	while (!S.bContextSwitchStop)
 	{
-		File file;
-		if (!file.Open("/tmp/microprofile-contextswitch", FileMode::FM_Read, FSRoot::FSR_Absolute))
+		FileSystem* fileSystem = fsGetSystemFileSystem();
+		PathHandle path = fsCreatePath(fileSystem, "/tmp/microprofile-contextswitch");
+		FileStream* fh = fsOpenFile(path, FM_READ);
+		if(!fh)
 		{
 			usleep(1000000);
 			continue;
@@ -3043,18 +3048,18 @@ void ProfileTraceThread(void*)
 
 		S.bContextSwitchRunning = true;
 
-		char* pLine = 0;
+		char line[1024] = {};
 		size_t cap = 0;
 		size_t len = 0;
 
 		ProfileThreadIdType nLastThread[PROFILE_MAX_CONTEXT_SWITCH_THREADS] = { 0 };
 
-		while ((len = getline(&pLine, &cap, static_cast<FILE *>(file.GetHandle()))) > 0 && !S.bContextSwitchStop)
+		while ((len = fsReadFromStreamLine(fh, line, 1024)) > 0 && !S.bContextSwitchStop)
 		{
-			if (strncmp(pLine, "MPTD ", 5) != 0)
+			if (strncmp(line, "MPTD ", 5) != 0)
 				continue;
 
-			char* pos = pLine + 4;
+			char* pos = line + 4;
 			long cpu = strtol(pos + 1, &pos, 16);
 			long pid = strtol(pos + 1, &pos, 16);
 			long tid = strtol(pos + 1, &pos, 16);
@@ -3075,8 +3080,7 @@ void ProfileTraceThread(void*)
 			}
 		}
 
-		file.Close();
-
+		fsCloseStream(fh);
 		S.bContextSwitchRunning = false;
 	}
 }

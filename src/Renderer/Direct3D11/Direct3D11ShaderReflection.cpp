@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -31,7 +31,7 @@
 
 static DescriptorType sD3D11_TO_DESCRIPTOR[] = {
 	DESCRIPTOR_TYPE_UNIFORM_BUFFER,    //D3D_SIT_CBUFFER
-	DESCRIPTOR_TYPE_UNDEFINED,         //D3D_SIT_TBUFFER
+	DESCRIPTOR_TYPE_BUFFER,            //D3D_SIT_TBUFFER
 	DESCRIPTOR_TYPE_TEXTURE,           //D3D_SIT_TEXTURE
 	DESCRIPTOR_TYPE_SAMPLER,           //D3D_SIT_SAMPLER
 	DESCRIPTOR_TYPE_RW_TEXTURE,        //D3D_SIT_UAV_RWTYPED

@@ -34,9 +34,8 @@ option( BUILD_EXAMPLES "Build Examples" OFF )
 
 option( INSTALL_EASTL "Install EASTL" ON )
 
-find_package( Threads REQUIRED )
-
 if( BUILD_LINUX )
+	find_package( Threads REQUIRED )
     find_package( X11 REQUIRED )
     include_directories( ${X11_INCLUDE_DIR} )
 endif()
@@ -102,7 +101,7 @@ set_prefix( THEFORGE_PUBLIC_H_FILES include/Renderer/
     IRay.h
     IRenderer.h
     IShaderReflection.h
-    ResourceLoader.h
+    IResourceLoader.h
     )
 
 set_prefix( THEFORGE_INTERFACES_FILES include/Renderer/Interfaces/
@@ -112,7 +111,6 @@ set_prefix( THEFORGE_INTERFACES_FILES include/Renderer/Interfaces/
     IMemory.h
     IMiddleware.h
     IOperatingSystem.h
-    IPlatformEvents.h
     IProfiler.h
     IThread.h
     ITime.h
@@ -148,17 +146,47 @@ set_prefix( THEFORGE_CORE_FILES src/OS/Core/
     ThreadSystem.h
     FileSystem.cpp
     GPUConfig.h
-    PlatformEvents.cpp
     RingBuffer.h
     ThreadSystem.cpp
     Timer.cpp
     )
 
+# FileSystem
+set_prefix( THEFORGE_FILE_SYSTEM_FILES src/OS/FileSystem/
+    FileSystemInternal.cpp
+	FileSystemInternal.h
+	MemoryStream.cpp
+	MemoryStream.h
+	SystemFileStream.cpp
+	SystemFileStream.h
+	SystemRun.cpp
+	ZipFileStream.cpp
+	ZipFileStream.h
+	ZipFileSystem.cpp
+	ZipFileSystem.h
+    )
+	
+set(THEFORGE_FILE_SYSTEM_FILES ${THEFORGE_FILE_SYSTEM_FILES}
+	third_party/zip/zip.cpp
+	)
+	
+set_prefix( THEFORGE_FILE_SYSTEM_UNIX_FILES src/OS/FileSystem/
+	UnixFileSystem.cpp
+	UnixFileSystem.h
+    )
+
 # Image
+file(GLOB_RECURSE BASIS_UNIVERSAL_FILES 
+	third_party/basis_universal/*.cpp
+	third_party/basis_universal/*.h
+	)
+list(FILTER BASIS_UNIVERSAL_FILES EXCLUDE REGEX ".*webgl.*")
+	
 set( THEFORGE_IMAGE_FILES
     src/OS/Image/Image.cpp
     include/Renderer/Image/Image.h
     third_party/TinyEXR/tinyexr.cpp
+	${BASIS_UNIVERSAL_FILES}
     )
 
 # Logging
@@ -242,6 +270,7 @@ set_prefix( THEFORGE_DIRECT3D11_FILES src/Renderer/Direct3D11/
 # Direct3D 12
 set_prefix( THEFORGE_DIRECT3D12_FILES src/Renderer/Direct3D12/
     Direct3D12.cpp
+    Direct3D12Hooks.cpp
     Direct3D12Hooks.h
     Direct3D12MemoryAllocator.cpp
     Direct3D12MemoryAllocator.h
@@ -274,6 +303,9 @@ set( THEFORGE_VULKAN_DEP_FILES
 add_library( TFImage STATIC 
     ${THEFORGE_IMAGE_FILES}
     )
+target_include_directories(TFImage PRIVATE 
+	"third_party/basis_universal/contrib/previewers/lib"
+	)
 install( TARGETS TFImage DESTINATION lib )
 
 if( BUILD_EXAMPLES )
@@ -298,6 +330,8 @@ if( BUILD_ANDROID )
         ${THEFORGE_ANDROID_FILES}
         ${THEFORGE_MATH_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
+		${THEFORGE_FILE_SYSTEM_FILES}
+		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
     )
     #target_compile_definitions( TFAndroid PRIVATE NO_GAINPUT )
     target_link_libraries( TFAndroid EASTL )
@@ -310,6 +344,8 @@ if( BUILD_IOS )
         ${THEFORGE_IOS_FILES}
         ${THEFORGE_MATH_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
+		${THEFORGE_FILE_SYSTEM_FILES}
+		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
     )
     #target_compile_definitions( TFiOS PRIVATE NO_GAINPUT )
     target_link_libraries( TFiOS "-framework AppKit" EASTL )
@@ -322,6 +358,8 @@ if( BUILD_LINUX )
         ${THEFORGE_LINUX_FILES}
         ${THEFORGE_MATH_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
+		${THEFORGE_FILE_SYSTEM_FILES}
+		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
         ${X11_LIBRARIES}
     )
     #target_compile_definitions( TFLinux PRIVATE NO_GAINPUT )
@@ -335,6 +373,8 @@ if( BUILD_MACOS )
         ${THEFORGE_MACOS_FILES}
         ${THEFORGE_MATH_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
+		${THEFORGE_FILE_SYSTEM_FILES}
+		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
     )
     #target_compile_definitions( TFmacOS PRIVATE NO_GAINPUT )
     target_link_libraries( TFmacOS "-framework AppKit" EASTL )
@@ -347,6 +387,7 @@ if( BUILD_WINDOWS )
         ${THEFORGE_WINDOWS_FILES}
         ${THEFORGE_MATH_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
+		${THEFORGE_FILE_SYSTEM_FILES}
     )
     #target_compile_definitions( TFWindows PRIVATE NO_GAINPUT )
     target_link_libraries( TFWindows EASTL )
@@ -364,8 +405,8 @@ if( BUILD_DIRECT3D11 )
         ${THEFORGE_LOGGING_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
         )
-    target_compile_definitions( TFDirect3D11 PRIVATE DIRECT3D11 )
-    target_link_libraries( TFDirect3D12 ${D3D11_LIBRARIES} )
+    target_compile_definitions( TFDirect3D11 PUBLIC DIRECT3D11 )
+    target_link_libraries( TFDirect3D11 ${D3D11_LIBRARIES} )
     install( TARGETS TFDirect3D11 DESTINATION lib )
 endif()
 
@@ -380,8 +421,10 @@ if( BUILD_DIRECT3D12 )
         ${THEFORGE_LOGGING_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
         )
-    target_compile_definitions( TFDirect3D12 PRIVATE DIRECT3D12 )
-    target_link_libraries( TFDirect3D12 ${D3D12_LIBRARIES} )
+		
+	find_library(PIX_LIBRARY WinPixEventRuntime PATHS third_party/winpixeventruntime/bin)
+    target_compile_definitions( TFDirect3D12 PUBLIC DIRECT3D12 )
+    target_link_libraries( TFDirect3D12 ${D3D12_LIBRARIES} ${PIX_LIBRARY} )
     install( TARGETS TFDirect3D12 DESTINATION lib )
 endif()
 
@@ -396,7 +439,7 @@ if( BUILD_METAL )
         ${THEFORGE_LOGGING_FILES}
         ${THEFORGE_MEMORYTRACKING_FILES}
         )
-    target_compile_definitions( TFMetal PRIVATE METAL )
+    target_compile_definitions( TFMetal PUBLIC METAL )
     target_link_libraries( TFMetal "-framework Metal" )
     install( TARGETS TFMetal DESTINATION lib )
 endif()
@@ -413,7 +456,7 @@ if( BUILD_VULKAN )
         ${THEFORGE_MEMORYTRACKING_FILES}
         ${THEFORGE_SPIRV_CROSS_FILES}
         )
-    target_compile_definitions( TFVulkan PRIVATE VULKAN )
+    target_compile_definitions( TFVulkan PUBLIC VULKAN )
     target_link_libraries( TFVulkan ${Vulkan_LIBRARIES} )
     install( TARGETS TFVulkan DESTINATION lib )
 endif()
@@ -494,12 +537,10 @@ endif()
 set_prefix( THEFORGE_MICROPROFILE_FILES third_party/MicroProfile/
     ProfilerBase.h
     ProfilerHTML.h
-    ProfilerUI.h
+    ProfilerWidgetsUI.h
     Profiler.cpp
     ProfilerBase.cpp
-    ProfilerDraw.cpp
-    ProfilerInput.cpp
-    ProfilerUI.cpp
+    ProfilerWidgetsUI.cpp
     )
 
 if( BUILD_DIRECT3D11 )
@@ -533,6 +574,7 @@ endif()
 
 # Examples
 macro( add_theforge_example THEFORGE_EXAMPLES_NAME THEFORGE_TARGET THEFORGE_BACKEND )
+    target_compile_definitions( TF${THEFORGE_TARGET} PRIVATE ${THEFORGE_EXAMPLES_DEFINES} )
     add_executable( ${THEFORGE_EXAMPLES_NAME}${THEFORGE_TARGET}${THEFORGE_BACKEND} src/Examples/${THEFORGE_EXAMPLES_NAME}/${THEFORGE_EXAMPLES_NAME}.cpp )
     target_compile_definitions( ${THEFORGE_EXAMPLES_NAME}${THEFORGE_TARGET}${THEFORGE_BACKEND} PRIVATE ${THEFORGE_EXAMPLES_DEFINES} )
     target_link_libraries( ${THEFORGE_EXAMPLES_NAME}${THEFORGE_TARGET}${THEFORGE_BACKEND} ${THEFORGE_EXAMPLES_DEPS} )
@@ -552,8 +594,7 @@ if( BUILD_EXAMPLES )
     install( DIRECTORY src/Middleware/UI/Shaders
                 DESTINATION bin/Examples/Middleware/UI )
     set_prefix( THEFORGE_CAMERA_FILES src/Examples/Camera/
-        FpsCameraController.cpp
-        GuiCameraController.cpp
+        CameraController.cpp
         Interfaces/ICameraController.h
     )
     add_library( TFCamera STATIC ${THEFORGE_CAMERA_FILES} )
@@ -562,8 +603,7 @@ if( BUILD_EXAMPLES )
     add_subdirectory( third_party/gainput EXCLUDE_FROM_ALL )
     set_prefix( THEFORGE_INPUT_FILES src/Examples/Input/
         InputSystem.cpp
-        InputSystem.h
-        InputMappings.h
+        Interfaces/IInput.h
     )
     add_library( TFInput STATIC ${THEFORGE_INPUT_FILES} )
     target_link_libraries( TFInput gainputstatic )
@@ -592,6 +632,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_IOS AND BUILD_METAL )
             set( THEFORGE_EXAMPLES_DEPS
                 TFMetal
+                TFImage
                 TFiOS
                 TFCamera
                 TFInput
@@ -625,6 +666,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_MACOS AND BUILD_METAL )
             set( THEFORGE_EXAMPLES_DEPS
                 TFMetal
+                TFImage
                 TFmacOS 
                 TFCamera
                 TFInput
@@ -640,6 +682,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_WINDOWS AND BUILD_DIRECT3D11 )
             set( THEFORGE_EXAMPLES_DEPS
                 TFDirect3D11
+                TFImage
                 TFWindows 
                 TFCamera
                 TFInput
@@ -655,6 +698,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_WINDOWS AND BUILD_DIRECT3D12 )
             set( THEFORGE_EXAMPLES_DEPS
                 TFDirect3D12
+                TFImage
                 TFWindows
                 TFCamera
                 TFInput
@@ -666,10 +710,15 @@ if( BUILD_EXAMPLES )
                 DIRECT3D12
             )
             add_theforge_example( ${THEFORGE_EXAMPLES_NAME} Windows Direct3D12 )
+			set(EXE_NAME ${THEFORGE_EXAMPLES_NAME}WindowsDirect3D12)
+			add_custom_command(TARGET ${EXE_NAME} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/winpixeventruntime/bin/WinPixEventRuntime.dll" $<TARGET_FILE_DIR:${EXE_NAME}> 
+			)
         endif()
         if( BUILD_WINDOWS AND BUILD_VULKAN )
             set( THEFORGE_EXAMPLES_DEPS
                 TFVulkan
+                TFImage
                 TFWindows
                 TFCamera
                 TFInput

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -23,18 +23,32 @@
 */
 
 #pragma once
-#include "Renderer/IRenderer.h"
-#include "Renderer/Interfaces/IFileSystem.h"
-#include "Renderer/Interfaces/IMiddleware.h"
-#include "Renderer/Interfaces/ILog.h"
+#include "Interfaces/IFileSystem.h"
+#include "Interfaces/IMiddleware.h"
+#include "Interfaces/ILog.h"
 #include "EASTL/vector.h"
 #include "EASTL/string.h"
 #include "../Text/Fontstash.h"
 
 typedef void (*WidgetCallback)();
-extern FSRoot FSR_MIDDLEWARE_UI;
 
+extern ResourceDirectory RD_MIDDLEWARE_UI;
+
+struct Renderer;
 struct Texture;
+struct Shader;
+struct RootSignature;
+struct DescriptorSet;
+struct Pipeline;
+struct Sampler;
+struct RasterizerState;
+struct DepthState;
+struct BlendState;
+struct Buffer;
+struct Texture;
+
+struct GpuProfiler;
+struct GpuProfileDrawDesc;
 
 class IWidget
 {
@@ -63,6 +77,9 @@ class IWidget
 		pOnDeactivatedAfterEdit;    // Widget was just made inactive from an active state and changed its underlying value.  This is useful for undo/redo patterns.
 
 	eastl::string mLabel;
+
+  // Set to true for any frame the widget is hovered.
+  bool mHovered = false;
 
 	protected:
 	void ProcessCallbacks();
@@ -175,6 +192,29 @@ class LabelWidget: public IWidget
 	void     Draw();
 };
 
+class ColorLabelWidget : public IWidget
+{
+public:
+  ColorLabelWidget(const eastl::string& _label, const float4& _color) : 
+    IWidget(_label),
+    mColor(_color) {}
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  float4 mColor;
+};
+
+class HorizontalSpaceWidget : public IWidget
+{
+public:
+  HorizontalSpaceWidget() : IWidget("") {}
+
+  IWidget* Clone() const;
+  void     Draw();
+};
+
 class SeparatorWidget: public IWidget
 {
 	public:
@@ -182,6 +222,18 @@ class SeparatorWidget: public IWidget
 
 	IWidget* Clone() const;
 	void     Draw();
+};
+
+class VerticalSeparatorWidget : public IWidget
+{
+public:
+  VerticalSeparatorWidget(const uint32_t& _lines) : IWidget(""), mLineCount(_lines) {}
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  uint32_t mLineCount;
 };
 
 class ButtonWidget: public IWidget
@@ -377,6 +429,29 @@ class CheckboxWidget: public IWidget
 	bool* pData;
 };
 
+class OneLineCheckboxWidget : public IWidget
+{
+public:
+  OneLineCheckboxWidget(const eastl::string& _label, bool* _data, const uint32_t& _color) : IWidget(_label), pData(_data), mColor(_color) {}
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  bool* pData;
+  uint32_t mColor;
+};
+
+class CursorLocationWidget : public IWidget
+{
+public:
+  CursorLocationWidget(const eastl::string& _label, const float2& _location) : IWidget(_label), mLocation(_location) {}
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  float2 mLocation;
+};
+
 class DropdownWidget: public IWidget
 {
 	public:
@@ -400,6 +475,28 @@ class DropdownWidget: public IWidget
 	eastl::vector<uint32_t>        mValues;
 	eastl::vector<eastl::string> mNames;
 };
+
+class ColumnWidget : public IWidget
+{
+public:
+  ColumnWidget(const eastl::string& _label, const eastl::vector<IWidget*>& _perColWidgets) : IWidget(_label) 
+  {
+    mNumColumns = (uint32_t)_perColWidgets.size();
+    for (uint32_t i = 0; i < _perColWidgets.size(); ++i) 
+    {
+      mPerColumnWidgets.push_back(_perColWidgets[i]);
+    }
+  }
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  eastl::vector<IWidget*> mPerColumnWidgets;
+  uint32_t mNumColumns;
+};
+
+
 
 class ProgressBarWidget: public IWidget
 {
@@ -429,6 +526,54 @@ class ColorSliderWidget: public IWidget
 
 	protected:
 	uint32_t* pData;
+};
+
+class HistogramWidget : public IWidget
+{
+public:
+  HistogramWidget(const eastl::string& _label, float* _values, uint32_t _valuesCount, float* _minScale, float* _maxScale, float2 _graphScale, eastl::string* _title) : 
+    IWidget(_label),
+    pValues(_values),
+    mCount(_valuesCount),
+    mMinScale(_minScale),
+    mMaxScale(_maxScale),
+    mHistogramSize(_graphScale),
+    mHistogramTitle(_title)
+  {}
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  float* pValues;
+  uint32_t mCount;
+  float* mMinScale;
+  float* mMaxScale;
+  float2 mHistogramSize;
+  eastl::string* mHistogramTitle;
+};
+
+class PlotLinesWidget : public IWidget 
+{
+public:
+  PlotLinesWidget(const eastl::string& _label, float* _values, uint32_t _valueCount, float* _scaleMin, float* _scaleMax, float2* _plotScale, eastl::string* _title)
+    : IWidget(_label),
+      mValues(_values),
+      mNumValues(_valueCount),
+      mScaleMin(_scaleMin),
+      mScaleMax(_scaleMax),
+      mPlotScale(_plotScale),
+      mTitle(_title)
+  {}
+  IWidget* Clone() const;
+  void     Draw();
+protected:
+  float* mValues;
+  uint32_t mNumValues;
+  float* mScaleMin;
+  float* mScaleMax;
+  float2* mPlotScale;
+  eastl::string* mTitle;
 };
 
 class ColorPickerWidget: public IWidget
@@ -463,16 +608,125 @@ class TextboxWidget: public IWidget
 	bool     mAutoSelectAll;
 };
 
-struct Renderer;
-struct Texture;
-struct Shader;
-struct RootSignature;
-struct DescriptorBinder;
-struct Pipeline;
-struct Sampler;
-struct RasterizerState;
-struct DepthState;
-struct BlendState;
+class DynamicTextWidget : public IWidget 
+{
+public:
+  DynamicTextWidget(const eastl::string& _label, char* _data, uint32_t const _length, float4* _color) :
+    IWidget(_label),
+    pData(_data),
+    mLength(_length),
+    pColor(_color)
+  {  
+  }
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  char*    pData;
+  uint32_t mLength;
+  float4*  pColor;
+};
+
+class FilledRectWidget : public IWidget
+{
+public:
+    FilledRectWidget(const eastl::string& _label, const float2& _pos, const float2& _scale, const uint32_t& _colorHex) :
+    IWidget(_label),
+    mPos(_pos),
+    mScale(_scale),
+    mColor(_colorHex)
+  {
+  }
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  float2 mPos;
+  float2 mScale;
+  uint32_t mColor;
+};
+
+class DrawTextWidget : public IWidget
+{
+public:
+  DrawTextWidget(const eastl::string& _label, const float2& _pos, const uint32_t& _colorHex) :
+    IWidget(_label),
+    mPos(_pos),
+    mColor(_colorHex)
+  {
+  }
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  float2 mPos;
+  uint32_t mColor;
+};
+
+class DrawTooltipWidget : public IWidget
+{
+public:
+  DrawTooltipWidget(const eastl::string& _label, bool* _showTooltip, char* _text) :
+    IWidget(_label),
+    mShowTooltip(_showTooltip),
+    mText(_text)
+  {}
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  bool* mShowTooltip;
+  char* mText;
+};
+
+class DrawLineWidget : public IWidget
+{
+public:
+  DrawLineWidget(const eastl::string& _label, const float2& _pos1, const float2& _pos2, const uint32_t& _colorHex, const bool& _addItem) :
+    IWidget(_label),
+    mPos1(_pos1),
+    mPos2(_pos2),
+    mColor(_colorHex),
+    mAddItem(_addItem)
+  {
+  }
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  float2 mPos1;
+  float2 mPos2;
+  uint32_t mColor;
+  bool mAddItem;
+};
+
+class DrawCurveWidget : public IWidget
+{
+public:
+  DrawCurveWidget(const eastl::string& _label, float2* _positions, uint32_t _numPoints, float _thickness, const uint32_t& _colorHex) :
+    IWidget(_label),
+    mPos(_positions),
+    mNumPoints(_numPoints),
+    mThickness(_thickness),
+    mColor(_colorHex)
+  {
+  }
+
+  IWidget* Clone() const;
+  void     Draw();
+
+protected:
+  float2* mPos;
+  uint32_t mNumPoints;
+  float mThickness;
+  uint32_t mColor;
+};
+
 
 typedef struct GuiDesc
 {
@@ -522,21 +776,21 @@ class GuiComponent
 	void     RemoveWidget(IWidget* pWidget);
 	void     RemoveAllWidgets();
 
-	class GUIDriver*          pDriver;
-	eastl::vector<IWidget*> mWidgets;
-	eastl::vector<bool>     mWidgetsClone;
-	float4                    mInitialWindowRect;
-	float4                    mCurrentWindowRect;
-	eastl::string           mTitle;
-	bool                      mActive;
-	// UI Component settings that can be modified at runtime by the client.
-	bool mHasCloseButton;
-	// defaults to GUI_COMPONENT_FLAGS_ALWAYS_AUTO_RESIZE
-	int32_t mFlags;
-
+	eastl::vector<IWidget*>        mWidgets;
+	eastl::vector<bool>            mWidgetsClone;
 	// Contextual menus when right clicking the title bar
-	eastl::vector<eastl::string> mContextualMenuLabels;
+	eastl::vector<eastl::string>   mContextualMenuLabels;
 	eastl::vector<WidgetCallback>  mContextualMenuCallbacks;
+	float4                         mInitialWindowRect;
+	float4                         mCurrentWindowRect;
+	eastl::string                  mTitle;
+	uintptr_t                      pFont;
+	// defaults to GUI_COMPONENT_FLAGS_ALWAYS_AUTO_RESIZE
+	int32_t                        mFlags;
+
+	bool                           mActive;
+	// UI Component settings that can be modified at runtime by the client.
+	bool                           mHasCloseButton;
 };
 /************************************************************************/
 // Helper Class for removing and adding properties easily
@@ -580,7 +834,7 @@ typedef struct DynamicUIWidgets
 			conf_free(mDynamicProperties[i]);
 		}
 
-		mDynamicProperties.clear();
+		mDynamicProperties.set_capacity(0);
 	}
 
 private:
@@ -591,23 +845,29 @@ private:
 /************************************************************************/
 class GUIDriver
 {
-	public:
-		struct GUIUpdate
-		{
-			GuiComponent** pGuiComponents;
-			uint32_t componentCount;
-			float deltaTime;
-			float width;
-			float height;
-			bool showDemoWindow;
-		};
+public:
+	struct GUIUpdate
+	{
+		GuiComponent** pGuiComponents;
+		uint32_t componentCount;
+		float deltaTime;
+		float width;
+		float height;
+		bool showDemoWindow;
+	};
+
+	virtual ~GUIDriver() {}
 
 	virtual bool init(Renderer* pRenderer, uint32_t const maxDynamicUIUpdatesPerBatch) = 0;
 	virtual void exit() = 0;
 
-	virtual bool
-				 load(class Fontstash* fontID, float fontSize, struct Texture* cursorTexture = 0, float uiwidth = 600, float uiheight = 400) = 0;
+	virtual bool load(RenderTarget** ppRts, uint32_t count) = 0;
 	virtual void unload() = 0;
+
+	// For GUI with custom shaders not necessary in a normal application
+	virtual void setCustomShader(Shader* pShader) = 0;
+
+	virtual bool addFont(void* pFontBuffer, uint32_t fontBufferSize, void* pFontGlyphRanges, float fontSize, uintptr_t* pFont) = 0;
 
 	virtual void* getContext() = 0;
 
@@ -615,9 +875,10 @@ class GUIDriver
 
 	virtual void draw(Cmd* q) = 0;
 
-	virtual void onInput(const struct ButtonData* data) = 0;
-	virtual bool isHovering(const float4& windowRect) = 0;
-	virtual int  needsTextInput() const = 0;
+    virtual bool     isFocused() = 0;
+	virtual bool     onText(const wchar_t* pText) = 0;
+	virtual bool     onButton(uint32_t button, bool press, const float2* vec) = 0;
+	virtual uint8_t  wantTextInput() const = 0;
 
 	protected:
 	// Since gestures events always come first, we want to dismiss any other inputs after that
@@ -632,8 +893,6 @@ class GUIDriver
 #undef DrawText
 #endif
 
-typedef struct GpuProfiler        GpuProfiler;
-typedef struct GpuProfileDrawDesc GpuProfileDrawDesc;
 struct UIAppImpl
 {
 	Renderer*  pRenderer;
@@ -652,13 +911,13 @@ class UIApp: public IMiddleware
 	bool Init(Renderer* renderer);
 	void Exit();
 
-	bool Load(RenderTarget** rts);
+	bool Load(RenderTarget** rts, uint32_t count = 1);
 	void Unload();
 
 	void Update(float deltaTime);
 	void Draw(Cmd* cmd);
 
-	uint          LoadFont(const char* pFontPath, uint root);
+	uint          LoadFont(const char* pFontPath, ResourceDirectory root);
 	GuiComponent* AddGuiComponent(const char* pTitle, const GuiDesc* pDesc);
 	void          RemoveGuiComponent(GuiComponent* pComponent);
 	void          RemoveAllGuiComponents();
@@ -683,18 +942,22 @@ class UIApp: public IMiddleware
 
 	void DrawDebugGpuProfile(Cmd* pCmd, const float2& screenCoordsInPx, GpuProfiler* pGpuProfiler, const GpuProfileDrawDesc* pDrawDesc = NULL);
 
+	bool    OnText(const wchar_t* pText) { return pDriver->onText(pText); }
+	bool    OnButton(uint32_t button, bool press, const float2* vec) { return pDriver->onButton(button, press, vec); }
+    uint8_t WantTextInput() { return pDriver->wantTextInput(); }
+    bool    IsFocused() { return pDriver->isFocused(); }
 	/************************************************************************/
 	// Data
 	/************************************************************************/
 	class GUIDriver*  pDriver;
 	struct UIAppImpl* pImpl;
-	bool              mHovering;
+	Shader*           pCustomShader = NULL;
 
 	// Following var is useful for seeing UI capabilities and tweaking style settings.
 	// Will only take effect if at least one GUI Component is active.
 	bool mShowDemoUiWindow;
 
-	private:
+private:
 	float   mWidth;
 	float   mHeight;
 	int32_t  mFontAtlasSize = 0;
@@ -704,38 +967,27 @@ class UIApp: public IMiddleware
 class VirtualJoystickUI
 {
 	public:
-	VirtualJoystickUI(): mInsideRadius(0.0f), mOutsideRadius(0.f), mDeadzone(0.f), mInitialized(false), mActive(false) {}
+	VirtualJoystickUI(float insideRadius = 100.0f, float outsideRadius = 200.0f)
+#if defined(TARGET_IOS) || defined(__ANDROID__)
+		: mInsideRadius(insideRadius), mOutsideRadius(outsideRadius)
+#endif
+	{}
 
 	// Init resources
 	bool Init(Renderer* pRenderer, const char* pJoystickTexture, uint root);
-	// Initialize input behavior parameters
-	// This can be called many times in case different camera want to have different values.
-	void InitLRSticks(float insideRad = 150.f, float outsideRad = 300.f, float deadzone = 20.f);
 	void Exit();
-	bool Load(RenderTarget* pScreenRT, uint depthFormat = 0);
+	bool Load(RenderTarget* pScreenRT);
 	void Unload();
 	void Update(float dt);
+    void Draw(Cmd* pCmd, const float4& color);
+    bool OnMove(uint32_t id, bool press, const float2* vec);
 
-	// Get normalized diretion of joystick.
-	vec2 GetLeftStickDir();
-	vec2 GetRightStickDir();
-	// Get outer radius of joystick. (Biggest size)
-	vec2 GetStickRadius();
-	// Retrieve state of specific joystick
-	bool IsActive(bool left = true);
-	// Check if any joystick is currently active
-	bool IsAnyActive();
-	// Helper to enable/disable joystick
-	void SetActive(bool state);
-	bool OnInputEvent(const ButtonData* pData);
-
-	void Draw(Cmd* pCmd, const float4& color);
-
-	private:
+private:
+#if defined(TARGET_IOS) || defined(__ANDROID__) || defined(NX64)
 	Renderer*         pRenderer;
 	Shader*           pShader;
 	RootSignature*    pRootSignature;
-	DescriptorBinder* pDescriptorBinder;
+	DescriptorSet*    pDescriptorSet;
 	Pipeline*         pPipeline;
 	Texture*          pTexture;
 	Sampler*          pSampler;
@@ -743,24 +995,19 @@ class VirtualJoystickUI
 	DepthState*       pDepthState;
 	RasterizerState*  pRasterizerState;
 	Buffer*           pMeshBuffer;
-	vec2              mRenderSize;
+	float2            mRenderSize;
 	//input related
-	private:
-	float mInsideRadius;
-	float mOutsideRadius;
-	float mDeadzone;
-	bool  mInitialized;
-	bool  mActive;
+	float             mInsideRadius;
+	float             mOutsideRadius;
 
 	struct StickInput
 	{
-		uint32_t mTouchIndex;
-		bool     mIsPressed;
-		vec2     mStartPos;
-		vec2     mCurrPos;
-		vec2     mDir;
+		bool     mPressed;
+		float2   mStartPos;
+		float2   mCurrPos;
 	};
 	// Left -> Index 0
 	// Right -> Index 1
-	StickInput mSticks[2];
+	StickInput       mSticks[2];
+#endif
 };

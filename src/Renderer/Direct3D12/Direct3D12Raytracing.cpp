@@ -14,7 +14,7 @@
 // Renderer
 #include "IRenderer.h"
 #include "IRay.h"
-#include "ResourceLoader.h"
+#include "IResourceLoader.h"
 #include "Direct3D12Hooks.h"
 #include "Direct3D12MemoryAllocator.h"
 #include "Interfaces/IMemory.h"
@@ -22,52 +22,8 @@
 //check if WindowsSDK is used which supports raytracing
 #ifdef ENABLE_RAYTRACING
 
-// TODO: all thesae definitions are also declared in Direct3D12: move to a common H file
-typedef struct DescriptorStoreHeap
-{
-	uint32_t mNumDescriptors;
-	/// DescriptorInfo Increment Size
-	uint32_t mDescriptorSize;
-	/// Bitset for finding SAFE_FREE descriptor slots
-	uint32_t* flags;
-	/// Lock for multi-threaded descriptor allocations
-	Mutex* pAllocationMutex;
-	uint64_t mUsedDescriptors;
-	/// Type of descriptor heap -> CBV / DSV / ...
-	D3D12_DESCRIPTOR_HEAP_TYPE mType;
-	/// DX Heap
-	ID3D12DescriptorHeap* pCurrentHeap;
-	/// Start position in the heap
-	D3D12_CPU_DESCRIPTOR_HANDLE mStartCpuHandle;
-	D3D12_GPU_DESCRIPTOR_HANDLE mStartGpuHandle;
-} DescriptorStoreHeap;
-
-/// Descriptor table structure holding the native descriptor set handle
-typedef struct DescriptorTable
-{
-	/// Handle to the start of the cbv_srv_uav descriptor table in the gpu visible cbv_srv_uav heap
-	D3D12_CPU_DESCRIPTOR_HANDLE mBaseCpuHandle;
-	D3D12_GPU_DESCRIPTOR_HANDLE mBaseGpuHandle;
-	uint32_t                    mDescriptorCount;
-	uint32_t                    mNodeIndex;
-} DescriptorTable;
-
-#define MAX_FRAMES_IN_FLIGHT 3U
-//using HashMap = eastl::unordered_map<uint64_t, uint32_t>;
-
-using DescriptorBinderMap = eastl::hash_map<const RootSignature*, struct DescriptorBinderNode*>;
-
-typedef struct DescriptorBinder
-{
-	DescriptorStoreHeap* pCbvSrvUavHeap[MAX_GPUS];
-	DescriptorStoreHeap* pSamplerHeap[MAX_GPUS];
-	DescriptorBinderMap  mRootSignatureNodes;
-} DescriptorBinder;
-
-#ifndef ENABLE_RENDERER_RUNTIME_SWITCH
 extern void addBuffer(Renderer* pRenderer, const BufferDesc* desc, Buffer** pp_buffer);
 extern void removeBuffer(Renderer* pRenderer, Buffer* p_buffer);
-#endif
 
 extern void add_descriptor_heap(Renderer* pRenderer, D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags, uint32_t numDescriptors, struct DescriptorStoreHeap** ppDescHeap);
 extern void reset_descriptor_heap(struct DescriptorStoreHeap* pHeap);
@@ -147,10 +103,6 @@ struct RaytracingShaderTable
 	uint64_t					mHitGroupRecordSize;
 };
 
-#if defined(__cplusplus) && defined(ENABLE_RENDERER_RUNTIME_SWITCH)
-namespace d3d12 {
-#endif
-
 bool isRaytracingSupported(Renderer* pRenderer)
 {
 	ASSERT(pRenderer);
@@ -200,7 +152,7 @@ Buffer* createGeomVertexBuffer(const AccelerationStructureGeometryDesc* desc)
 	vbDesc.mDesc.mVertexStride = sizeof(float3);
 	vbDesc.pData = desc->pVertexArray;
 	vbDesc.ppBuffer = &result;
-	addResource(&vbDesc);
+	addResource(&vbDesc, NULL, LOAD_PRIORITY_NORMAL);
 
 	return result;
 }
@@ -219,7 +171,7 @@ Buffer* createGeomIndexBuffer(const AccelerationStructureGeometryDesc* desc)
 	indexBufferDesc.mDesc.mIndexType = desc->indexType;
 	indexBufferDesc.pData = desc->indexType == INDEX_TYPE_UINT32 ? (void*) desc->pIndices32 : (void*) desc->pIndices16;
 	indexBufferDesc.ppBuffer = &result;
-	addResource(&indexBufferDesc);
+	addResource(&indexBufferDesc, NULL, LOAD_PRIORITY_NORMAL);
 
 	return result;
 }
@@ -404,7 +356,7 @@ void addAccelerationStructure(Raytracing* pRaytracing, const AccelerationStructu
 	scratchBufferDesc.mDesc.mFlags = BUFFER_CREATION_FLAG_NO_DESCRIPTOR_VIEW_CREATION;
 	scratchBufferDesc.mDesc.mSize = pAccelerationStructure->mScratchBufferSize;
 	scratchBufferDesc.ppBuffer = &pAccelerationStructure->pScratchBuffer;
-	addResource(&scratchBufferDesc);
+	addResource(&scratchBufferDesc, NULL, LOAD_PRIORITY_NORMAL);
 
 	*ppAccelerationStructure = pAccelerationStructure;
 }
@@ -443,7 +395,7 @@ void addRaytracingShader(Raytracing* pRaytracing, const unsigned char* pByteCode
 
 	{
 		ShaderLoadDesc desc = {};
-		desc.mStages[0] = { (char*)pByteCode, NULL, 0, FSR_SrcShaders };
+		desc.mStages[0] = { (char*)pByteCode, NULL, 0, RD_SHADER_SOURCES };
 		desc.mTarget = shader_target_6_3;
 
 		addShader(pRaytracing->pRenderer, &desc, &pShader->pShader);
@@ -463,7 +415,7 @@ void removeRaytracingShader(Raytracing* pRaytracing, RaytracingShader* pShader)
 
 static const uint64_t gShaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 
-void FillShaderIdentifiers(	const RaytracingShaderTableRecordDesc* pRecords, uint32_t shaderCount, 
+void FillShaderIdentifiers(	const char *const * pRecords, uint32_t shaderCount, 
 							ID3D12StateObjectProperties* pRtsoProps, uint64_t& maxShaderTableSize,
 							uint32_t& index, RaytracingShaderTable* pTable, Raytracing* pRaytracing)
 {
@@ -471,10 +423,10 @@ void FillShaderIdentifiers(	const RaytracingShaderTableRecordDesc* pRecords, uin
 	{
 		eastl::hash_set<uint32_t> addedTables;
 
-		const RaytracingShaderTableRecordDesc* pRecord = &pRecords[i];
+		const char* pRecordName = pRecords[i];
 		void* pIdentifier = NULL;
-		WCHAR* pName = (WCHAR*)conf_calloc(strlen(pRecord->pName) + 1, sizeof(WCHAR));
-		mbstowcs(pName, pRecord->pName, strlen(pRecord->pName));
+		WCHAR* pName = (WCHAR*)conf_calloc(strlen(pRecordName) + 1, sizeof(WCHAR));
+		mbstowcs(pName, pRecordName, strlen(pRecordName));
 
 		pIdentifier = pRtsoProps->GetShaderIdentifier(pName);
 
@@ -536,7 +488,7 @@ void FillShaderIdentifiers(	const RaytracingShaderTableRecordDesc* pRecords, uin
 	}
 }
 
-void CalculateMaxShaderRecordSize(const RaytracingShaderTableRecordDesc* pRecords, uint32_t shaderCount, uint64_t& maxShaderTableSize)
+void CalculateMaxShaderRecordSize(const char *const * pRecords, uint32_t shaderCount, uint64_t& maxShaderTableSize)
 {
 	// #TODO
 	//for (uint32_t i = 0; i < shaderCount; ++i)
@@ -600,7 +552,7 @@ void addRaytracingShaderTable(Raytracing* pRaytracing, const RaytracingShaderTab
 	/************************************************************************/
 	// Calculate max size for each element in the shader table
 	/************************************************************************/
-	CalculateMaxShaderRecordSize(pDesc->pRayGenShader, 1, maxShaderTableSize);
+	CalculateMaxShaderRecordSize(&pDesc->pRayGenShader, 1, maxShaderTableSize);
 	CalculateMaxShaderRecordSize(pDesc->pMissShaders, pDesc->mMissShaderCount, maxShaderTableSize);
 	CalculateMaxShaderRecordSize(pDesc->pHitGroups, pDesc->mHitGroupCount, maxShaderTableSize);
 	/************************************************************************/
@@ -624,7 +576,7 @@ void addRaytracingShaderTable(Raytracing* pRaytracing, const RaytracingShaderTab
 	pDesc->pPipeline->pDxrPipeline->QueryInterface(IID_PPV_ARGS(&pRtsoProps));
 	   
 	uint32_t index = 0;
-	FillShaderIdentifiers(	pDesc->pRayGenShader, 1, pRtsoProps,
+	FillShaderIdentifiers(	&pDesc->pRayGenShader, 1, pRtsoProps,
 							maxShaderTableSize, index, pTable, pRaytracing);
 
 	pTable->mMissRecordSize = maxShaderTableSize * pDesc->mMissShaderCount;
@@ -762,10 +714,6 @@ void cmdDispatchRays(Cmd* pCmd, Raytracing* pRaytracing, const RaytracingDispatc
 	pDxrCmd->DispatchRays(&dispatchDesc);
 	pDxrCmd->Release();
 }
-
-#if defined(__cplusplus) && defined(ENABLE_RENDERER_RUNTIME_SWITCH)
-}
-#endif
 /************************************************************************/
 // Utility Functions Implementation
 /************************************************************************/
@@ -826,6 +774,7 @@ void d3d12_addRaytracingPipeline(const RaytracingPipelineDesc* pDesc, Pipeline**
 	ASSERT(pPipeline);
 
 	pPipeline->mType = PIPELINE_TYPE_RAYTRACING;
+	pPipeline->mCompute.pRootSignature = pDesc->pGlobalRootSignature;
 	/************************************************************************/
 	// Pipeline Creation
 	/************************************************************************/
@@ -1097,15 +1046,9 @@ void d3d12_addRaytracingPipeline(const RaytracingPipelineDesc* pDesc, Pipeline**
 	*ppPipeline = pPipeline;
 }
 
-void d3d12_fillRaytracingRootDescriptorData(AccelerationStructure* pAccelerationStructure, D3D12_GPU_VIRTUAL_ADDRESS* pAddress)
-{
-	*pAddress = pAccelerationStructure->pASBuffer->pDxResource->GetGPUVirtualAddress();
-}
-
-void d3d12_fillRaytracingDescriptorHandle(AccelerationStructure* pAccelerationStructure, uint64_t* pHandle, uint64_t* pHash)
+void d3d12_fillRaytracingDescriptorHandle(AccelerationStructure* pAccelerationStructure, uint64_t* pHandle)
 {
 	*pHandle = pAccelerationStructure->pASBuffer->mDxSrvHandle.ptr;
-	*pHash = eastl::mem_hash<uint64_t>()(&pAccelerationStructure->pASBuffer->mBufferId, 1, *pHash);
 }
 
 void d3d12_cmdBindRaytracingPipeline(Cmd* pCmd, Pipeline* pPipeline)
@@ -1117,10 +1060,6 @@ void d3d12_cmdBindRaytracingPipeline(Cmd* pCmd, Pipeline* pPipeline)
 	pDxrCmd->Release();
 }
 #else
-#if defined(__cplusplus) && defined(ENABLE_RENDERER_RUNTIME_SWITCH)
-namespace d3d12 {
-#endif
-
 bool isRaytracingSupported(Renderer* pRenderer)
 {
 	return false;
@@ -1166,9 +1105,5 @@ void removeAccelerationStructure(Raytracing* pRaytracing, AccelerationStructure*
 void removeRaytracingShaderTable(Raytracing* pRaytracing, RaytracingShaderTable* pTable)
 {
 }
-
-#if defined(__cplusplus) && defined(ENABLE_RENDERER_RUNTIME_SWITCH)
-}
-#endif
 #endif
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -25,10 +25,10 @@
 #if defined(DIRECT3D12)
 
 #include "IRenderer.h"
-#include "Interfaces/ILog.h"
+#include "Interfaces\ILog.h"
 
 #ifdef _DURANGO
-#include "..\..\..\Xbox\CommonXBOXOne_3\OS\XBoxPrivateHeaders.h"
+#include "..\..\..\Xbox\Common_3\Renderer\XBoxPrivateHeaders.h"
 #else
 #define IID_ARGS IID_PPV_ARGS
 #endif
@@ -432,10 +432,9 @@ long d3d12_createBuffer(
 
 	AllocatorSuballocationType suballocType = RESOURCE_SUBALLOCATION_TYPE_BUFFER;
 
-	// For GPU buffers, use special memory type
-	// For CPU mapped UAV / SRV buffers, just use suballocation strategy
-	if (((pBuffer->mDesc.mDescriptors & DESCRIPTOR_TYPE_RW_BUFFER) || (pBuffer->mDesc.mDescriptors & DESCRIPTOR_TYPE_BUFFER)) &&
-		pMemoryRequirements->usage == RESOURCE_MEMORY_USAGE_GPU_ONLY)
+	// For GPU buffers, CPU mapped UAV / SRV buffers, we cannot use block allocation since it can lead to complications
+	// with determining FirstElement when creating the SRV / UAV and resource transitions
+	if (((pBuffer->mDesc.mDescriptors & DESCRIPTOR_TYPE_RW_BUFFER) || (pBuffer->mDesc.mDescriptors & DESCRIPTOR_TYPE_BUFFER)))
 		suballocType = RESOURCE_SUBALLOCATION_TYPE_BUFFER_SRV_UAV;
 
 	// 2. vkGetBufferMemoryRequirements.
@@ -1527,6 +1526,11 @@ ResourceAllocator::ResourceAllocator(const AllocatorCreateInfo* pCreateInfo):
 {
 	ASSERT(pCreateInfo->physicalDevice && pCreateInfo->device);
 
+#if RESOURCE_DEBUG_GLOBAL_MUTEX
+	if (!gDebugGlobalMutex.Init())
+		return;
+#endif
+
 	memset(&m_pBlockVectors, 0, sizeof(m_pBlockVectors));
 	memset(&m_HasEmptyBlock, 0, sizeof(m_HasEmptyBlock));
 	memset(&m_pOwnAllocations, 0, sizeof(m_pOwnAllocations));
@@ -1543,6 +1547,11 @@ ResourceAllocator::ResourceAllocator(const AllocatorCreateInfo* pCreateInfo):
 
 	for (size_t i = 0; i < GetMemoryTypeCount(); ++i)
 	{
+		if (!m_OwnAllocationsMutex[i].Init())
+			return;
+		if (!m_BlocksMutex[i].Init())
+			return;
+
 		for (size_t j = 0; j < RESOURCE_BLOCK_VECTOR_TYPE_COUNT; ++j)
 		{
 			m_pBlockVectors[i][j] = resourceAlloc_new(AllocatorBlockVector, this);
@@ -1560,7 +1569,14 @@ ResourceAllocator::~ResourceAllocator()
 			resourceAlloc_delete(m_pOwnAllocations[i][j]);
 			resourceAlloc_delete(m_pBlockVectors[i][j]);
 		}
+
+		m_OwnAllocationsMutex[i].Destroy();
+		m_BlocksMutex[i].Destroy();
 	}
+
+#if RESOURCE_DEBUG_GLOBAL_MUTEX
+	gDebugGlobalMutex.Destroy();
+#endif
 }
 
 UINT64 ResourceAllocator::GetPreferredBlockSize(ResourceMemoryUsage memUsage, uint32_t memTypeIndex) const

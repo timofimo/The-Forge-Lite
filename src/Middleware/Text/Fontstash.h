@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -23,12 +23,13 @@
 */
 
 #pragma once
-#include "OS/Math/MathTypes.h"
-#include "Renderer/Interfaces/IFileSystem.h"
+#include "Math/MathTypes.h"
+#include "Interfaces/IFileSystem.h"
 
 struct Renderer;
+struct RenderTarget;
 
-extern FSRoot FSR_MIDDLEWARE_TEXT;
+extern ResourceDirectory RD_MIDDLEWARE_TEXT;
 
 typedef struct TextDrawDesc
 {
@@ -50,22 +51,21 @@ typedef struct TextDrawDesc
 
 class Fontstash
 {
-	public:
-	Fontstash(Renderer* renderer, int width, int height);
-	void destroy();
+public:
+	bool init(Renderer* pRenderer, uint32_t width, uint32_t height);
+	void exit();
+
+	bool load(RenderTarget** ppRts, uint32_t count);
+	void unload();
 
 	//! Makes a font available to the font stash.
 	//! - Fonts can not be undefined in a FontStash due to its dynamic nature (once packed into an atlas, they cannot be unpacked, unless it is fully rebuilt)
 	//! - Defined fonts will automatically be unloaded when the Fontstash is destroyed.
 	//! - When it is paramount to be able to unload individual fonts, use multiple fontstashes.
-	int defineFont(const char* identification, const char* filename, uint32_t root);
+	int defineFont(const char* identification, const char* filename, ResourceDirectory root);
 
-	//! Find a font by user defined identification.
-	int getFontID(const char* identification);
-
-	const char* getFontName(const char* identification);
-	void*       getFontBuffer(const char* identification);
-	uint32_t    getFontBufferSize(const char* identification);
+	void*       getFontBuffer(uint32_t index);
+	uint32_t    getFontBufferSize(uint32_t index);
 
 	//! Draw text.
 	void drawText(

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "OS/Math/MathTypes.h"
+#include "../OS/Math/MathTypes.h"
 #include "EASTL/string.h"
 #include "EASTL/string_hash_map.h"
 #include "EASTL/vector.h"
@@ -35,12 +35,13 @@ struct Cmd;
 struct Renderer;
 struct Buffer;
 struct Queue;
-struct QueryHeap;
+struct QueryPool;
 struct ProfileThreadLog;
 
 typedef struct GpuTimer
 {
-	const static int32_t LENGTH_OF_HISTORY = 60;
+	static const uint32_t LENGTH_OF_HISTORY = 60;
+
 	eastl::string      mName;
 	uint32_t             mIndex;
 	uint32_t             mHistoryIndex;
@@ -69,9 +70,11 @@ typedef struct GpuTimerTree
 typedef struct GpuProfiler
 {
 	// double buffered
-	const static uint32_t NUM_OF_FRAMES = 2;
+	static const uint32_t NUM_OF_FRAMES = 2;
+	static const uint32_t MAX_TIMERS = 4096;
+
 	Buffer*               pReadbackBuffer[NUM_OF_FRAMES];
-	QueryHeap*            pQueryHeap[NUM_OF_FRAMES];
+	QueryPool*            pQueryPool[NUM_OF_FRAMES];
 	uint64_t*             pTimeStamp;
 	uint64_t*             pTimeStampBuffer;
 	double                mGpuTimeStampFrequency;
@@ -97,13 +100,14 @@ typedef struct GpuProfiler
 	char mGroupName[256] = "GPU";
 	ProfileThreadLog * pLog = nullptr;
 
+	bool mReset = true;
 	bool mUpdate;
 } GpuProfiler;
 
 double getAverageGpuTime(struct GpuProfiler* pGpuProfiler, struct GpuTimer* pGpuTimer);
 double getAverageCpuTime(struct GpuProfiler* pGpuProfiler, struct GpuTimer* pGpuTimer);
 
-void addGpuProfiler(Renderer* pRenderer, Queue* pQueue, struct GpuProfiler** ppGpuProfiler, const char * pName, uint32_t maxTimers = 4096);
+void addGpuProfiler(Renderer* pRenderer, Queue* pQueue, struct GpuProfiler** ppGpuProfiler, const char * pName, uint32_t maxTimers = GpuProfiler::MAX_TIMERS);
 void removeGpuProfiler(Renderer* pRenderer, struct GpuProfiler* pGpuProfiler);
 
 void cmdBeginGpuTimestampQuery(Cmd* pCmd, struct GpuProfiler* pGpuProfiler, const char* pName, bool addMarker = true, const float3& color = { 1,1,0 }, bool isRoot = false);

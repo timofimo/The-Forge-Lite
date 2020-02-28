@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Confetti Interactive Inc.
+ * Copyright (c) 2018-2020 The Forge Interactive Inc.
  *
  * This file is part of The-Forge
  * (see https://github.com/ConfettiFX/The-Forge).
@@ -23,11 +23,11 @@
 */
 
 #ifdef DIRECT3D12
-#include "../IRenderer.h"
+#include "IRenderer.h"
 #include "Interfaces/ILog.h"
 
 #ifdef _DURANGO
-#include "..\..\..\Xbox\CommonXBOXOne_3\OS\XBoxPrivateHeaders.h"
+#include "../../../Xbox/Common_3/Renderer/XBoxPrivateHeaders.h"
 #else
 #include <d3dcompiler.h>
 #include "DirectXShaderCompiler/dxcapi.use.h"
@@ -38,7 +38,7 @@ extern dxc::DxcDllSupport gDxcDllHelper;
 
 static DescriptorType sD3D12_TO_DESCRIPTOR[] = {
 	DESCRIPTOR_TYPE_UNIFORM_BUFFER,    //D3D_SIT_CBUFFER
-	DESCRIPTOR_TYPE_UNDEFINED,         //D3D_SIT_TBUFFER
+	DESCRIPTOR_TYPE_BUFFER,            //D3D_SIT_TBUFFER
 	DESCRIPTOR_TYPE_TEXTURE,           //D3D_SIT_TEXTURE
 	DESCRIPTOR_TYPE_SAMPLER,           //D3D_SIT_SAMPLER
 	DESCRIPTOR_TYPE_RW_TEXTURE,        //D3D_SIT_UAV_RWTYPED

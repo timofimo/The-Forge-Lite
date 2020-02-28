@@ -8,17 +8,20 @@
 #ifndef GAINPUT_H_
 #define GAINPUT_H_
 
-#if defined(_DURANGO) || defined(_XBOX_ONE)
+#if defined(VK_USE_PLATFORM_GGP)
+	#define GAINPUT_PLATFORM_GGP
+	#define GAINPUT_LIBEXPORT
+#elif defined(_DURANGO) || defined(_XBOX_ONE)
 #define GAINPUT_PLATFORM_XBOX_ONE
 #define GAINPUT_LIBEXPORT
-#include "../../../../../../../Xbox/CommonXBOXOne_3/OS/pch.h"
+#include "../../../../../../../Xbox/Common_3/OS/pch.h"
 #elif defined(__ANDROID__) || defined(ANDROID)
 	#define GAINPUT_PLATFORM_ANDROID
 	#define GAINPUT_LIBEXPORT
 #elif defined(__linux) || defined(__linux__) || defined(linux) || defined(LINUX)
 	#define GAINPUT_PLATFORM_LINUX
 	#define GAINPUT_LIBEXPORT
-#elif defined(_WIN32) || defined(__WIN32__) || defined(_MSC_VER)
+#elif defined(_WIN32) || defined(__WIN32__) || (defined(_MSC_VER) && !defined(NX64))
 	#define GAINPUT_PLATFORM_WIN
 	#if defined(GAINPUT_LIB_DYNAMIC)
 		#define GAINPUT_LIBEXPORT		__declspec(dllexport)
@@ -39,6 +42,12 @@
 	#else
 		#error Gainput: Unknown/unsupported Apple platform!
 	#endif
+#elif defined(NX64)
+	#define GAINPUT_PLATFORM_NX64
+	#define GAINPUT_LIBEXPORT
+#elif defined(ORBIS)
+	#define GAINPUT_PLATFORM_ORBIS
+	#define GAINPUT_LIBEXPORT
 #else
 	#error Gainput: Unknown/unsupported platform!
 #endif
@@ -70,7 +79,7 @@
 #define GAINPUT_ASSERT assert
 #define GAINPUT_UNUSED(x) (void)(x)
 
-#if defined(GAINPUT_PLATFORM_LINUX)
+#if defined(GAINPUT_PLATFORM_LINUX) || defined(GAINPUT_PLATFORM_GGP)
 
 #include <cstdlib>
 #include <stdint.h>
@@ -97,6 +106,16 @@ namespace gainput
 #include <stdint.h>
 #include <stdlib.h>
 struct AInputEvent;
+
+#elif defined(GAINPUT_PLATFORM_NX64)
+
+#include <cstdlib>
+#include <stdint.h>
+
+#elif defined(GAINPUT_PLATFORM_ORBIS)
+
+#include <cstdlib>
+#include <stdint.h>
 
 #endif
 

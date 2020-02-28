@@ -1,8 +1,6 @@
 #pragma once
 
-#if !defined(ENABLE_RENDERER_RUNTIME_SWITCH)
 #include "IRenderer.h"
-#endif
 
 #ifdef __cplusplus
 #ifndef MAKE_ENUM_FLAG
@@ -54,6 +52,8 @@ typedef struct RootSignatureDesc RootSignatureDesc;
 typedef struct ShaderResource ShaderResource;
 typedef struct DescriptorData DescriptorData;
 typedef struct ID3D12Device5 ID3D12Device5;
+typedef struct ParallelPrimitives ParallelPrimitives;
+typedef struct SSVGFDenoiser SSVGFDenoiser;
 
 //Supported by DXR. Metal ignores this.
 typedef enum AccelerationStructureBuildFlags
@@ -103,7 +103,7 @@ typedef struct AccelerationStructureInstanceDesc
 typedef struct AccelerationStructureGeometryDesc
 {
 	AccelerationStructureGeometryFlags  mFlags;
-    float3*     pVertexArray;
+    void*       pVertexArray;
     unsigned    vertexCount;
     union{
         uint32_t*       pIndices32;
@@ -155,23 +155,13 @@ typedef struct RaytracingHitGroup
 	const char*			pHitGroupName;
 } RaytracingHitGroup;
 
-typedef struct RaytracingShaderTableRecordDesc
-{
-	const char*		pName;
-#if defined(METAL)
-	bool            mInvokeTraceRay;
-    uint32_t        mHitShaderIndex;
-    uint32_t        mMissShaderIndex;
-#endif
-} RaytracingShaderTableRecordDesc;
-
 typedef struct RaytracingShaderTableDesc
 {
 	Pipeline*						    pPipeline;
 	RootSignature*						pEmptyRootSignature;
-	RaytracingShaderTableRecordDesc*	pRayGenShader;
-	RaytracingShaderTableRecordDesc*	pMissShaders;
-	RaytracingShaderTableRecordDesc*	pHitGroups;
+	const char*							pRayGenShader;
+	const char**						pMissShaders;
+	const char**						pHitGroups;
 	unsigned							mMissShaderCount;
 	unsigned							mHitGroupCount;
 } RaytracingShaderTableDesc;
@@ -183,8 +173,8 @@ typedef struct RaytracingDispatchDesc
 	RaytracingShaderTable*  pShaderTable;
 #if defined(METAL)
 	AccelerationStructure*  pTopLevelAccelerationStructure;
-	DescriptorData*         pParams;
-	uint32_t                mParamCount;
+    DescriptorSet*          pSets[DESCRIPTOR_UPDATE_FREQ_COUNT];
+    uint32_t                pIndexes[DESCRIPTOR_UPDATE_FREQ_COUNT];
 #endif
 } RaytracingDispatchDesc;
 
@@ -205,6 +195,10 @@ struct Raytracing
 #endif
 #ifdef METAL
     MPSRayIntersector* pIntersector;
+	
+	ParallelPrimitives *pParallelPrimitives;
+	id <MTLComputePipelineState> mClassificationPipeline;
+	id <MTLArgumentEncoder> mClassificationArgumentEncoder;
 #endif
 
 #ifdef VULKAN
@@ -213,8 +207,6 @@ struct Raytracing
 #endif
 #endif
 };
-
-#if !defined(ENABLE_RENDERER_RUNTIME_SWITCH)
 
 API_INTERFACE bool FORGE_CALLCONV isRaytracingSupported(Renderer* pRenderer);
 API_INTERFACE bool FORGE_CALLCONV initRaytracing(Renderer* pRenderer, Raytracing** ppRaytracing);
@@ -230,4 +222,9 @@ API_INTERFACE void FORGE_CALLCONV removeRaytracingShaderTable(Raytracing* pRaytr
 API_INTERFACE void FORGE_CALLCONV cmdBuildAccelerationStructure(Cmd* pCmd, Raytracing* pRaytracing, RaytracingBuildASDesc* pDesc);
 API_INTERFACE void FORGE_CALLCONV cmdDispatchRays(Cmd* pCmd, Raytracing* pRaytracing, const RaytracingDispatchDesc* pDesc);
 
+#ifdef METAL
+API_INTERFACE void FORGE_CALLCONV addSSVGFDenoiser(Renderer* pRenderer, SSVGFDenoiser** ppDenoiser);
+API_INTERFACE void FORGE_CALLCONV removeSSVGFDenoiser(SSVGFDenoiser* pDenoiser);
+API_INTERFACE void FORGE_CALLCONV clearSSVGFDenoiserTemporalHistory(SSVGFDenoiser* pDenoiser);
+API_INTERFACE Texture* FORGE_CALLCONV cmdSSVGFDenoise(Cmd* pCmd, SSVGFDenoiser* pDenoiser, Texture* pSourceTexture, Texture* pMotionVectorTexture, Texture* pDepthNormalTexture, Texture* pPreviousDepthNormalTexture);
 #endif
