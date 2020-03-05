@@ -55,14 +55,23 @@ if( BUILD_VULKAN )
     include_directories( ${Vulkan_INCLUDE_DIR} )
 endif()
 
+set( THE_FORGE_INCLUDE 
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Renderer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Examples
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Tools
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+	CACHE
+	INTERNAL
+	""
+	FORCE
+	)
+
 include_directories(
-    include
-    include/Renderer
-    src
+    ${THE_FORGE_INCLUDE}
     src/Examples
-    src/OS
-    src/Tools
-    third_party
 )
 
 # Spirv-Cross
@@ -138,14 +147,20 @@ set_prefix( THEFORGE_EASTL_FILES third_party/EASTL/
     )
 add_library( EASTL STATIC ${THEFORGE_EASTL_FILES} )
 
+# gainput
+option( GAINPUT_BUILD_SHARED "BUILD_SHARED" OFF )
+add_subdirectory( third_party/gainput EXCLUDE_FROM_ALL )
+
 # Core
 set_prefix( THEFORGE_CORE_FILES src/OS/Core/
     Atomics.h
+    CameraController.cpp
     Compiler.h
     DLL.h
     ThreadSystem.h
     FileSystem.cpp
     GPUConfig.h
+    InputSystem.cpp
     RingBuffer.h
     ThreadSystem.cpp
     Timer.cpp
@@ -181,6 +196,7 @@ file(GLOB_RECURSE BASIS_UNIVERSAL_FILES
 	third_party/basis_universal/*.h
 	)
 list(FILTER BASIS_UNIVERSAL_FILES EXCLUDE REGEX ".*webgl.*")
+list(FILTER BASIS_UNIVERSAL_FILES EXCLUDE REGEX ".*contrib.*")
 	
 set( THEFORGE_IMAGE_FILES
     src/OS/Image/Image.cpp
@@ -295,7 +311,7 @@ set_prefix( THEFORGE_VULKAN_FILES src/Renderer/Vulkan/
 set( THEFORGE_VULKAN_DEP_FILES
     src/Tools/SpirvTools/SpirvTools.cpp
     src/Tools/SpirvTools/SpirvTools.h
-    third_party/volk/volk.c
+    #third_party/volk/volk.c
     third_party/volk/volk.h
     )
 
@@ -303,9 +319,9 @@ set( THEFORGE_VULKAN_DEP_FILES
 add_library( TFImage STATIC 
     ${THEFORGE_IMAGE_FILES}
     )
-target_include_directories(TFImage PRIVATE 
-	"third_party/basis_universal/contrib/previewers/lib"
-	)
+#target_include_directories(TFImage PRIVATE 
+#	"third_party/basis_universal/contrib/previewers/lib"
+#	)
 install( TARGETS TFImage DESTINATION lib )
 
 if( BUILD_EXAMPLES )
@@ -333,7 +349,6 @@ if( BUILD_ANDROID )
 		${THEFORGE_FILE_SYSTEM_FILES}
 		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
     )
-    #target_compile_definitions( TFAndroid PRIVATE NO_GAINPUT )
     target_link_libraries( TFAndroid EASTL )
     install( TARGETS TFAndroid DESTINATION lib )
 endif()
@@ -347,7 +362,6 @@ if( BUILD_IOS )
 		${THEFORGE_FILE_SYSTEM_FILES}
 		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
     )
-    #target_compile_definitions( TFiOS PRIVATE NO_GAINPUT )
     target_link_libraries( TFiOS "-framework AppKit" EASTL )
     install( TARGETS TFiOS DESTINATION lib )
 endif()
@@ -362,7 +376,6 @@ if( BUILD_LINUX )
 		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
         ${X11_LIBRARIES}
     )
-    #target_compile_definitions( TFLinux PRIVATE NO_GAINPUT )
     target_link_libraries( TFLinux ${CMAKE_THREAD_LIBS_INIT} EASTL )
     install( TARGETS TFLinux DESTINATION lib )
 endif()
@@ -376,7 +389,6 @@ if( BUILD_MACOS )
 		${THEFORGE_FILE_SYSTEM_FILES}
 		${THEFORGE_FILE_SYSTEM_UNIX_FILES}
     )
-    #target_compile_definitions( TFmacOS PRIVATE NO_GAINPUT )
     target_link_libraries( TFmacOS "-framework AppKit" EASTL )
     install( TARGETS TFmacOS DESTINATION lib )
 endif()
@@ -389,7 +401,6 @@ if( BUILD_WINDOWS )
         ${THEFORGE_MEMORYTRACKING_FILES}
 		${THEFORGE_FILE_SYSTEM_FILES}
     )
-    #target_compile_definitions( TFWindows PRIVATE NO_GAINPUT )
     target_link_libraries( TFWindows EASTL )
     install( TARGETS TFWindows DESTINATION lib )
 endif()
@@ -406,7 +417,7 @@ if( BUILD_DIRECT3D11 )
         ${THEFORGE_MEMORYTRACKING_FILES}
         )
     target_compile_definitions( TFDirect3D11 PUBLIC DIRECT3D11 )
-    target_link_libraries( TFDirect3D11 ${D3D11_LIBRARIES} )
+    target_link_libraries( TFDirect3D11 ${D3D11_LIBRARIES} gainputstatic TFImage )
     install( TARGETS TFDirect3D11 DESTINATION lib )
 endif()
 
@@ -424,7 +435,7 @@ if( BUILD_DIRECT3D12 )
 		
 	find_library(PIX_LIBRARY WinPixEventRuntime PATHS third_party/winpixeventruntime/bin)
     target_compile_definitions( TFDirect3D12 PUBLIC DIRECT3D12 )
-    target_link_libraries( TFDirect3D12 ${D3D12_LIBRARIES} ${PIX_LIBRARY} )
+    target_link_libraries( TFDirect3D12 ${D3D12_LIBRARIES} ${PIX_LIBRARY} gainputstatic TFImage )
     install( TARGETS TFDirect3D12 DESTINATION lib )
 endif()
 
@@ -440,7 +451,7 @@ if( BUILD_METAL )
         ${THEFORGE_MEMORYTRACKING_FILES}
         )
     target_compile_definitions( TFMetal PUBLIC METAL )
-    target_link_libraries( TFMetal "-framework Metal" )
+    target_link_libraries( TFMetal "-framework Metal" gainputstatic TFImage )
     install( TARGETS TFMetal DESTINATION lib )
 endif()
 
@@ -457,7 +468,7 @@ if( BUILD_VULKAN )
         ${THEFORGE_SPIRV_CROSS_FILES}
         )
     target_compile_definitions( TFVulkan PUBLIC VULKAN )
-    target_link_libraries( TFVulkan ${Vulkan_LIBRARIES} )
+    target_link_libraries( TFVulkan ${Vulkan_LIBRARIES} gainputstatic TFImage )
     install( TARGETS TFVulkan DESTINATION lib )
 endif()
 
@@ -472,7 +483,6 @@ set( THEFORGE_MIDDLEWARE_UI_FILES
     src/Middleware/UI/AppUI.h
     src/Middleware/UI/imgui_user.h
     src/Middleware/UI/AppUI.cpp
-    src/Middleware/UI/imgui_user.cpp
     src/Middleware/UI/ImguiGUIDriver.cpp
     third_party/imgui/imconfig.h
     third_party/imgui/imgui_internal.h
@@ -579,7 +589,7 @@ macro( add_theforge_example THEFORGE_EXAMPLES_NAME THEFORGE_TARGET THEFORGE_BACK
     target_compile_definitions( ${THEFORGE_EXAMPLES_NAME}${THEFORGE_TARGET}${THEFORGE_BACKEND} PRIVATE ${THEFORGE_EXAMPLES_DEFINES} )
     target_link_libraries( ${THEFORGE_EXAMPLES_NAME}${THEFORGE_TARGET}${THEFORGE_BACKEND} ${THEFORGE_EXAMPLES_DEPS} )
     set_target_properties( ${THEFORGE_EXAMPLES_NAME}${THEFORGE_TARGET}${THEFORGE_BACKEND} PROPERTIES OUTPUT_NAME ${THEFORGE_EXAMPLES_NAME} )
-    add_dependencies( TF${THEFORGE_TARGET} TF${THEFORGE_BACKEND} TFCamera TFInput )
+    add_dependencies( TF${THEFORGE_TARGET} TF${THEFORGE_BACKEND} )
     install( TARGETS ${THEFORGE_EXAMPLES_NAME}${THEFORGE_TARGET}${THEFORGE_BACKEND} DESTINATION bin/Examples/${THEFORGE_EXAMPLES_NAME} )
     install( DIRECTORY src/Examples/${THEFORGE_EXAMPLES_NAME}/Shaders/${THEFORGE_BACKEND}
             DESTINATION bin/Examples/${THEFORGE_EXAMPLES_NAME}/Shaders )
@@ -593,21 +603,6 @@ if( BUILD_EXAMPLES )
                 DESTINATION bin/Examples/Middleware/Text )
     install( DIRECTORY src/Middleware/UI/Shaders
                 DESTINATION bin/Examples/Middleware/UI )
-    set_prefix( THEFORGE_CAMERA_FILES src/Examples/Camera/
-        CameraController.cpp
-        Interfaces/ICameraController.h
-    )
-    add_library( TFCamera STATIC ${THEFORGE_CAMERA_FILES} )
-
-    option( GAINPUT_BUILD_SHARED "BUILD_SHARED" OFF )
-    add_subdirectory( third_party/gainput EXCLUDE_FROM_ALL )
-    set_prefix( THEFORGE_INPUT_FILES src/Examples/Input/
-        InputSystem.cpp
-        Interfaces/IInput.h
-    )
-    add_library( TFInput STATIC ${THEFORGE_INPUT_FILES} )
-    target_link_libraries( TFInput gainputstatic )
-    add_dependencies( TFInput gainputstatic )
 
     foreach( THEFORGE_EXAMPLES_NAME ${THEFORGE_EXAMPLES_NAMES} )
         install( DIRECTORY src/Examples/${THEFORGE_EXAMPLES_NAME}/GPUCfg
@@ -616,10 +611,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_ANDROID AND BUILD_VULKAN )
             set( THEFORGE_EXAMPLES_DEPS
                 TFVulkan
-                TFImage
                 TFAndroid
-                TFCamera
-                TFInput
                 TFProfilerVulkan
                 ${THEFORGE_MIDDLEWARE_VULKAN_LIBRARIES}
                 ${Vulkan_LIBRARIES}
@@ -632,10 +624,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_IOS AND BUILD_METAL )
             set( THEFORGE_EXAMPLES_DEPS
                 TFMetal
-                TFImage
                 TFiOS
-                TFCamera
-                TFInput
                 TFProfilerMetal
                 ${THEFORGE_MIDDLEWARE_METAL_LIBRARIES}
                 "-framework Metal"
@@ -648,10 +637,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_LINUX AND BUILD_VULKAN )
             set( THEFORGE_EXAMPLES_DEPS
                 TFVulkan
-                TFImage
                 TFLinux
-                TFCamera
-                TFInput
                 TFProfilerVulkan
                 ${THEFORGE_MIDDLEWARE_VULKAN_LIBRARIES}
                 ${Vulkan_LIBRARIES}
@@ -666,10 +652,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_MACOS AND BUILD_METAL )
             set( THEFORGE_EXAMPLES_DEPS
                 TFMetal
-                TFImage
                 TFmacOS 
-                TFCamera
-                TFInput
                 TFProfilerMetal
                 ${THEFORGE_MIDDLEWARE_METAL_LIBRARIES}
                 "-framework Metal"
@@ -682,10 +665,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_WINDOWS AND BUILD_DIRECT3D11 )
             set( THEFORGE_EXAMPLES_DEPS
                 TFDirect3D11
-                TFImage
                 TFWindows 
-                TFCamera
-                TFInput
                 TFProfilerDirect3D11
                 ${THEFORGE_MIDDLEWARE_DIRECT3D11_LIBRARIES}
                 ${D3D11_LIBRARIES}
@@ -698,10 +678,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_WINDOWS AND BUILD_DIRECT3D12 )
             set( THEFORGE_EXAMPLES_DEPS
                 TFDirect3D12
-                TFImage
                 TFWindows
-                TFCamera
-                TFInput
                 TFProfilerDirect3D12
                 ${THEFORGE_MIDDLEWARE_DIRECT3D12_LIBRARIES}
                 ${D3D12_LIBRARIES}
@@ -718,10 +695,7 @@ if( BUILD_EXAMPLES )
         if( BUILD_WINDOWS AND BUILD_VULKAN )
             set( THEFORGE_EXAMPLES_DEPS
                 TFVulkan
-                TFImage
                 TFWindows
-                TFCamera
-                TFInput
                 TFProfilerVulkan
                 ${THEFORGE_MIDDLEWARE_VULKAN_LIBRARIES}
                 ${Vulkan_LIBRARIES}
